@@ -27,16 +27,16 @@ frontend/
 │   └── favicon.svg
 ├── src/
 │   ├── lib/
-│   │   └── api.ts            # Typed API client (all fetch calls)
+│   │   └── api.ts            
 │   ├── components/
-│   │   ├── Navbar.tsx         # Sticky scroll-aware navigation
+│   │   ├── Navbar.tsx        
 │   │   └── Footer.tsx
 │   └── pages/
-│       ├── HomePage.tsx       # Landing page — API showcase & feature list
-│       ├── ShortenPage.tsx    # URL shortener form + session history
-│       └── StatsPage.tsx      # Short code stats lookup
+│       ├── HomePage.tsx       
+│       ├── ShortenPage.tsx  
+│       └── StatsPage.tsx    
 ├── index.html
-├── vite.config.ts             # Dev proxy: /api → http://localhost:3000
+├── vite.config.ts            
 ├── tailwind.config.js
 └── .env.example
 ```
