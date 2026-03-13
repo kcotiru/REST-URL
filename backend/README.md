@@ -152,13 +152,6 @@ Get access count and timestamps.
 }
 ```
 
----
-
-### Redirect (bonus)
-`GET /:code` — redirects (`302`) to the original URL and increments `accessCount`.
-
----
-
 ## Design Decisions
 
 - **Layered architecture** — controller → service → repository separation keeps each layer focused and testable.
