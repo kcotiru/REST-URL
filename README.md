@@ -4,7 +4,7 @@ A full-stack URL shortening service with a clean REST API backend and a modern R
 
 ```
 rest-url/
-├── url-shortener/   # Node.js + Express + TypeScript REST API (PostgreSQL via Supabase)
+├── backend/   # Node.js + Express + TypeScript REST API (PostgreSQL via Supabase)
 └── frontend/        # React + Vite + Tailwind CSS web interface
 ```
 
