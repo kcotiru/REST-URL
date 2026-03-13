@@ -29,28 +29,7 @@ The frontend proxies all `/api/*` calls to the backend during development. The b
 
 ---
 
-### 1. Database — Supabase Setup
-
-In your Supabase project, open **SQL Editor** and run:
-
-```sql
-CREATE TABLE urls (
-    "id"          SERIAL PRIMARY KEY,
-    "url"         TEXT         NOT NULL,
-    "shortCode"   VARCHAR(10)  UNIQUE NOT NULL,
-    "createdAt"   TIMESTAMPTZ  DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt"   TIMESTAMPTZ  DEFAULT CURRENT_TIMESTAMP,
-    "accessCount" INTEGER      DEFAULT 0
-);
-
-CREATE INDEX idx_shortCode ON urls ("shortCode");
-```
-
-Then go to **Project Settings → Database → Connection string → URI** and copy the connection string.
-
----
-
-### 2. Backend — `url-shortener/`
+### 1. Backend — `url-shortener/`
 
 ```bash
 cd url-shortener
@@ -73,7 +52,7 @@ npm run dev     # → http://localhost:3000
 
 ---
 
-### 3. Frontend — `frontend/`
+### 2. Frontend — `frontend/`
 
 ```bash
 cd frontend
