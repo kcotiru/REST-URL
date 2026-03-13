@@ -29,43 +29,6 @@ The frontend proxies all `/api/*` calls to the backend during development. The b
 
 ---
 
-### 1. Backend — `url-shortener/`
-
-```bash
-cd url-shortener
-npm install
-cp .env.example .env
-```
-
-Edit `.env`:
-
-```env
-PORT=3000
-NODE_ENV=development
-DATABASE_URL=postgresql://postgres.[ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres
-SHORT_CODE_LENGTH=7
-```
-
-```bash
-npm run dev     # → http://localhost:3000
-```
-
----
-
-### 2. Frontend — `frontend/`
-
-```bash
-cd frontend
-npm install
-npm run dev     # → http://localhost:5173
-```
-
-The Vite dev server proxies `/api` → `http://localhost:3000` automatically. No extra config needed.
-
-Open **http://localhost:5173** in your browser.
-
----
-
 ## Features
 
 - **Auto-generated short codes** — 7-char nanoid codes from a 62-char alphanumeric alphabet (~3.5 trillion unique codes)
