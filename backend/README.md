@@ -8,16 +8,16 @@ A production-ready REST API for shortening URLs, built with **Node.js**, **Expre
 
 ```
 src/
-├── config/          # DB pool setup
-├── controllers/     # HTTP request/response handlers
-├── middleware/      # Validation & error handling
-├── repositories/    # Raw SQL / data access layer
-├── routes/          # Express router definitions
-├── services/        # Business logic (short code generation, etc.)
-├── types/           # Shared TypeScript interfaces & DTOs
-├── utils/           # Custom error classes, ApiResponse helper
-├── app.ts           # App factory (middleware + DI wiring)
-└── index.ts         # Entry point (server + graceful shutdown)
+├── config/          
+├── controllers/    
+├── middleware/     
+├── repositories/  
+├── routes/        
+├── services/       
+├── types/       
+├── utils/         
+├── app.ts       
+└── index.ts       
 ```
 
 ---
