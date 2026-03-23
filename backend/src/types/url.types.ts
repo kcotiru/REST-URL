@@ -1,4 +1,4 @@
-// ── Domain entity (mirrors DB row) ──────────────────────────────────────────
+// ── Domain entity ──────────────────────────────────────────
 export interface UrlEntity {
   id: number;
   url: string;

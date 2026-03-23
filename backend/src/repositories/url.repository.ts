@@ -6,9 +6,7 @@ export class UrlRepository {
 
   async create(dto: CreateUrlDTO & { shortCode: string }): Promise<UrlEntity> {
     const { rows } = await this.db.query<UrlEntity>(
-      `INSERT INTO urls ("url", "shortCode")
-       VALUES ($1, $2)
-       RETURNING *`,
+      `INSERT INTO urls ("url", "shortCode") VALUES ($1, $2) RETURNING *`,
       [dto.url, dto.shortCode],
     );
     return rows[0];
@@ -25,8 +23,7 @@ export class UrlRepository {
   async update(shortCode: string, dto: UpdateUrlDTO): Promise<UrlEntity | null> {
     const { rows } = await this.db.query<UrlEntity>(
       `UPDATE urls
-       SET "url" = $1, "updatedAt" = CURRENT_TIMESTAMP
-       WHERE "shortCode" = $2
+       SET "url" = $1, "updatedAt" = CURRENT_TIMESTAMP WHERE "shortCode" = $2
        RETURNING *`,
       [dto.url, shortCode],
     );

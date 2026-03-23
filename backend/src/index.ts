@@ -12,13 +12,13 @@ const start = async (): Promise<void> => {
   const app = createApp();
 
   const server = app.listen(PORT, () => {
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
-    console.log(`   NODE_ENV: ${process.env.NODE_ENV || "development"}`);
+    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`NODE_ENV: ${process.env.NODE_ENV || "development"}`);
   });
 
   // ── Graceful shutdown ──────────────────────────────────────────────────────
   const shutdown = (signal: string) => {
-    console.log(`\n${signal} received — shutting down gracefully`);
+    console.log(`\n${signal} received — shutting down...`);
     server.close(() => {
       console.log("HTTP server closed");
       process.exit(0);

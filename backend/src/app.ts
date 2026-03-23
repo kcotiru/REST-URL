@@ -26,20 +26,11 @@ const createApp = (): Application => {
 
   // ── Routes ─────────────────────────────────────────────────────────────────
   app.use("/shorten", createUrlRouter(urlController));
-
-  // Redirect shorthand: GET /:code  →  302 to original URL
-  app.get(
-    "/:code",
-    validate(shortCodeParamSchema, "params"),
-    urlController.redirect,
-  );
-
-  // Health check
+  app.get("/:code", validate(shortCodeParamSchema, "params"), urlController.redirect);
   app.get("/health", (_req: Request, res: Response) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
-
-  // ── Error handler (must be last) ───────────────────────────────────────────
+  
   app.use(errorHandler);
 
   return app;

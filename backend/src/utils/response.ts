@@ -5,12 +5,7 @@ export class ApiResponse {
     return res.status(statusCode).json({ status: "success", data });
   }
 
-  static error(
-    res: Response,
-    message: string,
-    statusCode = 500,
-    errors?: unknown,
-  ): Response {
+  static error(res: Response, message: string, statusCode = 500, errors?: unknown): Response {
     return res.status(statusCode).json({
       status: "error",
       message,

@@ -5,11 +5,7 @@ import { ApiResponse } from "../utils/response";
 export class UrlController {
   constructor(private urlService: UrlService) {}
 
-  createShortUrl = async (
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
+  createShortUrl = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const result = await this.urlService.createShortUrl(req.body);
       ApiResponse.success(res, result, 201);
@@ -18,11 +14,7 @@ export class UrlController {
     }
   };
 
-  getByShortCode = async (
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
+  getByShortCode = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const result = await this.urlService.getByShortCode(req.params.code);
       ApiResponse.success(res, result);
@@ -31,11 +23,7 @@ export class UrlController {
     }
   };
 
-  updateShortUrl = async (
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
+  updateShortUrl = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const result = await this.urlService.updateShortUrl(
         req.params.code,
@@ -47,11 +35,7 @@ export class UrlController {
     }
   };
 
-  deleteShortUrl = async (
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
+  deleteShortUrl = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       await this.urlService.deleteShortUrl(req.params.code);
       res.status(204).send();
@@ -60,11 +44,7 @@ export class UrlController {
     }
   };
 
-  getStats = async (
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
+  getStats = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const result = await this.urlService.getStats(req.params.code);
       ApiResponse.success(res, result);
@@ -73,11 +53,7 @@ export class UrlController {
     }
   };
 
-  redirect = async (
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> => {
+  redirect = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const targetUrl = await this.urlService.redirect(req.params.code);
       res.redirect(302, targetUrl);
