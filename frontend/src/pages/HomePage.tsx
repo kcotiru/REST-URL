@@ -82,22 +82,30 @@ export default function HomePage() {
       {/* ── Hero ── */}
       <section className="relative pt-36 pb-28 px-6 overflow-hidden grid-bg noise-bg">
         {/* Radial glow */}
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-accent/5 blur-[100px] pointer-events-none" />
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] 
+        rounded-full bg-accent/5 blur-[100px] pointer-events-none" 
+        />
 
         <div className="relative max-w-4xl mx-auto text-center">
           {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-accent/25 bg-accent/5 mb-8 animate-fade-in">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-accent/25 
+          bg-accent/5 mb-8 animate-fade-in"
+          >
             <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse-slow" />
             <span className="text-xs font-mono text-accent tracking-widest uppercase">REST API Service</span>
           </div>
 
-          <h1 className="font-display text-6xl md:text-7xl font-extrabold leading-[1.05] tracking-tight mb-6 opacity-0-init animate-fade-up stagger-1">
+          <h1 className="font-display text-6xl md:text-7xl font-extrabold leading-[1.05] tracking-tight mb-6 
+          opacity-0-init animate-fade-up stagger-1"
+          >
             URL Shortening
             <br />
             <span className="text-gradient">Built for Developers</span>
           </h1>
 
-          <p className="font-body text-text-secondary text-lg md:text-xl max-w-2xl mx-auto leading-relaxed mb-10 opacity-0-init animate-fade-up stagger-2">
+          <p className="font-body text-text-secondary text-lg md:text-xl max-w-2xl mx-auto leading-relaxed mb-10 
+          opacity-0-init animate-fade-up stagger-2"
+          >
             A clean, fast REST API to shorten URLs, track access stats, and manage links programmatically.
             No signup required. Just hit the endpoint.
           </p>
@@ -105,20 +113,24 @@ export default function HomePage() {
           <div className="flex items-center justify-center gap-4 flex-wrap opacity-0-init animate-fade-up stagger-3">
             <Link
               to="/shorten"
-              className="flex items-center gap-2 px-6 py-3 bg-accent text-surface rounded-xl font-medium hover:bg-accent-dim transition-all hover:scale-105 active:scale-95 glow-accent-sm font-body"
+              className="flex items-center gap-2 px-6 py-3 bg-accent text-surface rounded-xl font-medium 
+              hover:bg-accent-dim transition-all hover:scale-105 active:scale-95 glow-accent-sm font-body"
             >
               Try It Now <ArrowRight className="w-4 h-4" />
             </Link>
             <Link
               to="/stats"
-              className="flex items-center gap-2 px-6 py-3 bg-surface-high border border-surface-border text-text-primary rounded-xl font-medium hover:border-accent/30 transition-all font-body"
+              className="flex items-center gap-2 px-6 py-3 bg-surface-high border border-surface-border 
+              text-text-primary rounded-xl font-medium hover:border-accent/30 transition-all font-body"
             >
               View Stats <BarChart3 className="w-4 h-4" />
             </Link>
           </div>
 
           {/* Pill stats */}
-          <div className="flex items-center justify-center gap-8 mt-14 flex-wrap opacity-0-init animate-fade-up stagger-4">
+          <div className="flex items-center justify-center gap-8 mt-14 flex-wrap opacity-0-init animate-fade-up 
+          stagger-4"
+          >
             {[['5', 'Endpoints'], ['O(1)', 'Lookups'], ['10', 'Char limit'], ['Supabase', 'Powered']].map(([val, lbl]) => (
               <div key={lbl} className="text-center">
                 <div className="font-display font-bold text-2xl text-accent">{val}</div>
@@ -144,7 +156,8 @@ export default function HomePage() {
             {endpoints.map(({ method, path, desc, color }) => (
               <div
                 key={path + method}
-                className="flex items-center gap-4 p-4 rounded-xl bg-surface border border-surface-border hover:border-surface-high transition-all group cursor-default"
+                className="flex items-center gap-4 p-4 rounded-xl bg-surface border border-surface-border 
+                hover:border-surface-high transition-all group cursor-default"
               >
                 <span className={`font-mono text-xs font-bold px-2.5 py-1 rounded-md min-w-[60px] text-center ${color}`}>
                   {method}
@@ -169,7 +182,9 @@ export default function HomePage() {
             <p className="text-text-secondary font-body leading-relaxed mb-6">
               POST a URL — optionally with a custom code — and get back a structured JSON response with your short code, timestamps, and ID.
             </p>
-            <Link to="/shorten" className="inline-flex items-center gap-2 text-accent text-sm font-medium hover:gap-3 transition-all font-body">
+            <Link to="/shorten" className="inline-flex items-center gap-2 text-accent text-sm font-medium hover:gap-3 
+            transition-all font-body"
+            >
               Open the shortener <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
@@ -183,11 +198,13 @@ export default function HomePage() {
               </div>
               <CopyButton text={`{"url":"https://example.com/very/long/path","customCode":"mylink"}`} />
             </div>
-            <pre className="px-4 py-4 text-xs font-mono text-text-secondary border-b border-surface-border overflow-x-auto">
-{`{
-  "url": "https://example.com/very/long/path",
-  "customCode": "mylink"
-}`}
+            <pre className="px-4 py-4 text-xs font-mono text-text-secondary border-b border-surface-border 
+            overflow-x-auto"
+            >
+              {`{
+                "url": "https://example.com/very/long/path",
+                "customCode": "mylink"
+              }`}
             </pre>
 
             {/* Response */}
@@ -219,10 +236,13 @@ export default function HomePage() {
             {features.map(({ icon: Icon, title, desc }, i) => (
               <div
                 key={title}
-                className="p-6 rounded-2xl bg-surface border border-surface-border hover:border-accent/25 transition-all group"
+                className="p-6 rounded-2xl bg-surface border border-surface-border hover:border-accent/25 
+                transition-all group"
                 style={{ animationDelay: `${i * 0.08}s` }}
               >
-                <div className="w-10 h-10 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-center mb-4 group-hover:bg-accent/15 transition-colors">
+                <div className="w-10 h-10 rounded-xl bg-accent/10 border border-accent/20 flex items-center 
+                justify-center mb-4 group-hover:bg-accent/15 transition-colors"
+                >
                   <Icon className="w-5 h-5 text-accent" />
                 </div>
                 <h3 className="font-display font-semibold text-text-primary mb-2">{title}</h3>
@@ -237,7 +257,9 @@ export default function HomePage() {
       <section className="py-28 px-6 text-center relative overflow-hidden">
         <div className="absolute inset-0 grid-bg opacity-50" />
         <div className="relative max-w-2xl mx-auto">
-          <div className="inline-flex items-center gap-2 mb-6 px-3 py-1.5 rounded-full border border-surface-border bg-surface-raised">
+          <div className="inline-flex items-center gap-2 mb-6 px-3 py-1.5 rounded-full border border-surface-border 
+          bg-surface-raised"
+          >
             <Globe className="w-3.5 h-3.5 text-accent" />
             <span className="text-xs font-mono text-text-muted">Supabase-powered PostgreSQL</span>
           </div>
@@ -250,7 +272,8 @@ export default function HomePage() {
           </p>
           <Link
             to="/shorten"
-            className="inline-flex items-center gap-2 px-8 py-4 bg-accent text-surface rounded-xl font-semibold text-lg hover:bg-accent-dim transition-all hover:scale-105 active:scale-95 glow-accent font-body"
+            className="inline-flex items-center gap-2 px-8 py-4 bg-accent text-surface rounded-xl font-semibold 
+            text-lg hover:bg-accent-dim transition-all hover:scale-105 active:scale-95 glow-accent font-body"
           >
             Start Shortening <Zap className="w-5 h-5" />
           </Link>

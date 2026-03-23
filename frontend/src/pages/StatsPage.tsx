@@ -118,13 +118,17 @@ export default function StatsPage() {
                     value={code}
                     onChange={(e) => setCode(e.target.value)}
                     placeholder="mylink"
-                    className="w-full pl-10 pr-4 py-3 bg-surface border border-surface-border rounded-xl text-text-primary placeholder:text-text-muted font-mono text-sm focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-all"
+                    className="w-full pl-10 pr-4 py-3 bg-surface border border-surface-border rounded-xl 
+                    text-text-primary placeholder:text-text-muted font-mono text-sm focus:outline-none 
+                    focus:border-accent/50 focus:ring-1 focus:ring-accent/20 transition-all"
                   />
                 </div>
                 <button
                   type="submit"
                   disabled={status === 'loading'}
-                  className="px-5 py-3 bg-accent text-surface rounded-xl font-semibold font-body hover:bg-accent-dim transition-all hover:scale-105 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2 glow-accent-sm"
+                  className="px-5 py-3 bg-accent text-surface rounded-xl font-semibold font-body 
+                  hover:bg-accent-dim transition-all hover:scale-105 active:scale-95 disabled:opacity-60 
+                  disabled:cursor-not-allowed flex items-center gap-2 glow-accent-sm"
                 >
                   {status === 'loading'
                     ? <RefreshCw className="w-4 h-4 animate-spin" />
@@ -142,7 +146,8 @@ export default function StatsPage() {
                     key={c}
                     type="button"
                     onClick={() => { setCode(c); lookup(undefined, c) }}
-                    className="text-xs font-mono px-2 py-1 rounded-md bg-surface border border-surface-border text-text-secondary hover:text-accent hover:border-accent/30 transition-all"
+                    className="text-xs font-mono px-2 py-1 rounded-md bg-surface border border-surface-border 
+                    text-text-secondary hover:text-accent hover:border-accent/30 transition-all"
                   >
                     /{c}
                   </button>
@@ -154,7 +159,8 @@ export default function StatsPage() {
 
         {/* Error */}
         {status === 'error' && (
-          <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-rose-500/10 border border-rose-500/25 mb-6 animate-slide-in">
+          <div className="flex items-start gap-3 px-4 py-3 rounded-xl bg-rose-500/10 border border-rose-500/25 
+          mb-6 animate-slide-in">
             <AlertCircle className="w-4 h-4 text-rose-400 mt-0.5 shrink-0" />
             <p className="text-sm text-rose-300 font-body">{error}</p>
           </div>
@@ -164,7 +170,8 @@ export default function StatsPage() {
         {stats && status === 'success' && (
           <div className="space-y-4 animate-fade-up">
             {/* Code header */}
-            <div className="flex items-center justify-between p-4 rounded-xl bg-surface-raised border border-surface-border">
+            <div className="flex items-center justify-between p-4 rounded-xl bg-surface-raised border 
+            border-surface-border">
               <div>
                 <div className="text-xs font-mono text-text-muted mb-1">Short Code</div>
                 <code className="font-mono text-lg font-bold text-accent">/{stats.shortCode}</code>
@@ -173,7 +180,8 @@ export default function StatsPage() {
                 href={stats.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1.5 text-xs text-text-muted hover:text-accent transition-colors font-mono"
+                className="flex items-center gap-1.5 text-xs text-text-muted hover:text-accent 
+                transition-colors font-mono"
               >
                 Visit origin <ExternalLink className="w-3.5 h-3.5" />
               </a>
@@ -212,7 +220,8 @@ export default function StatsPage() {
                 { label: 'Created At', value: fmt(stats.createdAt), icon: Calendar },
                 { label: 'Last Updated', value: fmt(stats.updatedAt), icon: Clock },
               ].map(({ label, value, icon: Icon }) => (
-                <div key={label} className="flex items-center gap-4 p-4 rounded-xl border border-surface-border bg-surface">
+                <div key={label} className="flex items-center gap-4 p-4 rounded-xl border border-surface-border 
+                bg-surface">
                   <Icon className="w-4 h-4 text-text-muted shrink-0" />
                   <div>
                     <div className="text-xs font-mono text-text-muted mb-0.5">{label}</div>
@@ -227,7 +236,8 @@ export default function StatsPage() {
         {/* Empty state */}
         {status === 'idle' && (
           <div className="text-center py-20 animate-fade-in">
-            <div className="w-16 h-16 rounded-2xl bg-surface-raised border border-surface-border flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 rounded-2xl bg-surface-raised border border-surface-border 
+            flex items-center justify-center mx-auto mb-4">
               <BarChart3 className="w-7 h-7 text-text-muted" />
             </div>
             <p className="text-text-muted font-body text-sm">Enter a short code above to see its stats</p>

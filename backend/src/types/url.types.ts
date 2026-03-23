@@ -8,7 +8,7 @@ export interface UrlEntity {
   accessCount: number;
 }
 
-// ── Request / Response DTOs ──────────────────────────────────────────────────
+// ── Request / Response DTOs ────────────────────────────────
 export interface CreateUrlDTO {
   url: string;
   customCode?: string; // optional; 3–10 alphanumeric chars

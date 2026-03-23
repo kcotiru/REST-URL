@@ -28,7 +28,9 @@ export default function Navbar() {
       <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2.5 group">
-          <div className="w-8 h-8 rounded-lg bg-accent/10 border border-accent/30 flex items-center justify-center group-hover:bg-accent/20 transition-colors">
+          <div className="w-8 h-8 rounded-lg bg-accent/10 border border-accent/30 
+          flex items-center justify-center group-hover:bg-accent/20 transition-colors"
+          >
             <Zap className="w-4 h-4 text-accent" />
           </div>
           <span className="font-display font-700 text-lg tracking-tight text-text-primary">
@@ -42,7 +44,8 @@ export default function Navbar() {
             <Link
               key={to}
               to={to}
-              className={`px-4 py-2 rounded-lg text-sm font-body font-medium transition-all duration-200 ${
+              className={`px-4 py-2 rounded-lg text-sm font-body font-medium transition-all 
+                duration-200 ${
                 pathname === to
                   ? 'bg-accent/10 text-accent border border-accent/20'
                   : 'text-text-secondary hover:text-text-primary hover:bg-surface-high'
@@ -53,7 +56,8 @@ export default function Navbar() {
           ))}
           <Link
             to="/shorten"
-            className="ml-3 px-4 py-2 bg-accent text-surface rounded-lg text-sm font-medium hover:bg-accent-dim transition-colors font-body"
+            className="ml-3 px-4 py-2 bg-accent text-surface rounded-lg text-sm 
+            font-medium hover:bg-accent-dim transition-colors font-body"
           >
             Get Started
           </Link>
@@ -70,7 +74,8 @@ export default function Navbar() {
 
       {/* Mobile menu */}
       {open && (
-        <div className="md:hidden bg-surface-raised border-b border-surface-border px-6 py-4 flex flex-col gap-2">
+        <div className="md:hidden bg-surface-raised border-b border-surface-border 
+        px-6 py-4 flex flex-col gap-2">
           {links.map(({ to, label }) => (
             <Link
               key={to}
