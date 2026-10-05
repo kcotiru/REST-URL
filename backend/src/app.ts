@@ -25,7 +25,8 @@ import { createRequireAuth } from "./middleware/auth";
 import { rateLimit } from "./middleware/rateLimit";
 import { validate, shortCodeParamSchema } from "./middleware/validate";
 
-const REDIRECT_LIMIT_PER_MIN = 600;
+// Per client IP, also applied to /api/v1/plans. Operators can tune it (and benchmarks raise it).
+const REDIRECT_LIMIT_PER_MIN = Number(process.env.REDIRECT_LIMIT_PER_MIN) || 600;
 
 const createApp = (): Application => {
   const app = express();
