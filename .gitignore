@@ -1,0 +1,6 @@
+.devswarm-temp/
+.env
+.env.*
+!.env.example
+node_modules/
+dist/
