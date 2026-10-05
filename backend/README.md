@@ -71,6 +71,9 @@ npm run dev
 
 # Production
 npm run build && npm start
+
+# Click worker (separate process, needs Redis)
+npm run worker
 ```
 
 ---
@@ -151,6 +154,31 @@ Get access count and timestamps.
   }
 }
 ```
+
+### `GET /api/v1/links/:code/analytics?from=YYYY-MM-DD&to=YYYY-MM-DD`
+Click analytics for a link you own (`404` otherwise). Days are UTC and `to` includes its whole day. Defaults: `to` = today, `from` = `to` − 6 days. `from` is clamped to the plan's `analyticsDays`, and the response reports the clamped range. `400` if a date is invalid or `from > to`.
+
+```json
+{ "status": "success", "data": {
+  "from": "2024-01-01", "to": "2024-01-07", "granularity": "hour", "total": 3,
+  "series": [{ "t": "2024-01-01T00:00:00Z", "count": 0 }],
+  "countries": [{ "value": "DE", "count": 3 }],
+  "referrers": [{ "value": "news.ycombinator.com", "count": 3 }],
+  "devices": [{ "value": "mobile", "count": 3 }] } }
+```
+The series is zero-filled; each top list has at most 10 entries and `value: null` means unknown.
+
+## Click analytics
+
+```
+redirect --LPUSH--> clicks:queue --worker (LMOVE, batch of 1000)--> clicks:processing --one SQL statement--> Postgres
+```
+
+- The redirect never waits on analytics: it pushes a small event (`i` id, `t` time, `u` link id, `r` referrer host, `c` country, `d` device class; never the IP) without awaiting it. If Redis is down the click is dropped.
+- `npm run worker` (`npm run build && npm run start:worker` in production) drains the queue every 2s. Events are moved to `clicks:processing` first and that list is deleted only after Postgres commits, so a crash replays the batch; event ids and `ON CONFLICT DO NOTHING` make the replay a no-op. Run a single worker.
+- One statement per flush inserts into `clicks`, bumps `urls."accessCount"` and upserts the `clicks_daily` rollup.
+- Run `db/migrations/004_clicks.sql` first (creates `clicks` and `clicks_daily`).
+- Retention: raw `clicks` are purged after 30 days (hourly job in the worker); `clicks_daily` is kept. Ranges up to 7 days read the raw table in hourly buckets, longer ones read the rollup in daily buckets.
 
 ## Design Decisions
 

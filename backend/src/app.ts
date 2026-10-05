@@ -7,6 +7,7 @@ import pool from "./config/database";
 import redis from "./config/redis";
 import { getUserPlan, PLANS } from "./config/plans";
 import { UrlRepository } from "./repositories/url.repository";
+import { ClickRepository } from "./repositories/click.repository";
 import { UrlService } from "./services/url.service";
 import { UrlController } from "./controllers/url.controller";
 import { createUrlRouter } from "./routes/url.routes";
@@ -37,7 +38,7 @@ const createApp = (): Application => {
 
   // ── Dependency wiring ──────────────────────────────────────────────────────
   const urlRepository = new UrlRepository(pool);
-  const urlService = new UrlService(urlRepository, redis);
+  const urlService = new UrlService(urlRepository, redis, new ClickRepository(pool));
   const urlController = new UrlController(urlService);
   const apiKeyRepository = new ApiKeyRepository(pool);
   const apiKeyService = new ApiKeyService(apiKeyRepository);

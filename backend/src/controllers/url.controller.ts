@@ -54,9 +54,23 @@ export class UrlController {
     }
   };
 
+  getAnalytics = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      // req.query was parsed and defaulted by analyticsQuerySchema.
+      const result = await this.urlService.getAnalytics(req.user!.id, req.params.code, req.query as unknown as { from: string; to: string });
+      ApiResponse.success(res, result);
+    } catch (err) {
+      next(err);
+    }
+  };
+
   redirect = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const targetUrl = await this.urlService.redirect(req.params.code);
+      const targetUrl = await this.urlService.redirect(req.params.code, {
+        referer: req.get("referer"),
+        country: req.get("cf-ipcountry") ?? req.get("x-vercel-ip-country"),
+        userAgent: req.get("user-agent"),
+      });
       // 302, not 301: browsers cache a 301 permanently, which would hide repeat clicks from analytics and ignore link edits.
       res.redirect(302, targetUrl);
     } catch (err) {

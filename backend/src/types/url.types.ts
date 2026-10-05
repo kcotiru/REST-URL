@@ -30,3 +30,27 @@ export interface UrlResponseDTO {
 export interface UrlStatsDTO extends UrlResponseDTO {
   accessCount: number;
 }
+
+// ── Click tracking / analytics ─────────────────────────────
+// The request headers a click event is built from (the service never sees `req`).
+export interface ClickContext {
+  referer?: string;
+  country?: string;
+  userAgent?: string;
+}
+
+export interface CountBy {
+  value: string | null; // null = unknown
+  count: number;
+}
+
+export interface AnalyticsDTO {
+  from: string;
+  to: string;
+  granularity: "hour" | "day";
+  total: number;
+  series: { t: string; count: number }[];
+  countries: CountBy[];
+  referrers: CountBy[];
+  devices: CountBy[];
+}

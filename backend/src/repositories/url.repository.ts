@@ -48,15 +48,6 @@ export class UrlRepository {
     return (rowCount ?? 0) > 0;
   }
 
-  async incrementAccessCount(shortCode: string): Promise<void> {
-    await this.db.query(
-      `UPDATE urls
-       SET "accessCount" = "accessCount" + 1, "updatedAt" = CURRENT_TIMESTAMP
-       WHERE "shortCode" = $1`,
-      [shortCode],
-    );
-  }
-
   async shortCodeExists(shortCode: string): Promise<boolean> {
     const { rows } = await this.db.query<{ exists: boolean }>(
       `SELECT EXISTS(SELECT 1 FROM urls WHERE "shortCode" = $1) AS exists`,

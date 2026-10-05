@@ -9,7 +9,9 @@
     "start": "node dist/index.js",
     "lint": "eslint src --ext .ts",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "worker": "ts-node-dev --transpile-only src/worker.ts",
+    "start:worker": "node dist/worker.js"
   },
   "dependencies": {
     "compression": "^1.7.4",
@@ -21,6 +23,7 @@
     "jose": "^5.10.0",
     "nanoid": "^3.3.7",
     "pg": "^8.12.0",
+    "ua-parser-js": "^1.0.41",
     "zod": "^3.23.8"
   },
   "devDependencies": {
@@ -30,6 +33,7 @@
     "@types/node": "^20.14.0",
     "@types/pg": "^8.11.6",
     "@types/supertest": "^7.2.1",
+    "@types/ua-parser-js": "^0.7.39",
     "supertest": "^7.3.1",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.4.5",

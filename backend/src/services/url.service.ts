@@ -1,9 +1,16 @@
+import { randomUUID } from "node:crypto";
 import { customAlphabet } from "nanoid";
+import UAParser from "ua-parser-js";
 import type Redis from "ioredis";
 import { UrlRepository } from "../repositories/url.repository";
-import { CreateUrlDTO, UpdateUrlDTO, UrlEntity, UrlResponseDTO, UrlStatsDTO } from "../types/url.types";
+import { ClickRepository } from "../repositories/click.repository";
+import {
+  AnalyticsDTO, ClickContext, CreateUrlDTO, UpdateUrlDTO, UrlEntity, UrlResponseDTO, UrlStatsDTO,
+} from "../types/url.types";
 import { NotFoundError, ValidationError } from "../utils/errors";
 import { RESERVED_CODES } from "../middleware/validate";
+import { getUserPlan, PLANS, RAW_CLICK_DAYS } from "../config/plans";
+import { addDays, isoDay } from "../utils/date";
 
 const SHORT_CODE_LENGTH = Number(process.env.SHORT_CODE_LENGTH) || 7;
 const ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
@@ -11,6 +18,25 @@ const generateCode = customAlphabet(ALPHABET, SHORT_CODE_LENGTH);
 
 const CACHE_TTL_SECONDS = 3600;
 const cacheKey = (shortCode: string) => `url:${shortCode}`;
+export const CLICK_QUEUE = "clicks:queue";
+
+const BOT = /bot|crawl|spider|slurp|preview/i;
+const COUNTRY = /^[A-Z]{2}$/;
+
+// Referrer host only: the path and query can carry anything.
+const referrerHost = (referer?: string): string | null => {
+  try {
+    return referer ? new URL(referer).hostname : null;
+  } catch {
+    return null;
+  }
+};
+
+const deviceClass = (ua = ""): "bot" | "mobile" | "tablet" | "desktop" => {
+  if (BOT.test(ua)) return "bot";
+  const type = new UAParser(ua).getDevice().type;
+  return type === "mobile" || type === "tablet" ? type : "desktop";
+};
 
 const toResponseDTO = (entity: UrlEntity): UrlResponseDTO => ({
   id: entity.id,
@@ -29,6 +55,7 @@ export class UrlService {
   constructor(
     private urlRepository: UrlRepository,
     private redis: Redis,
+    private clickRepository: ClickRepository,
   ) {}
 
   async createShortUrl(ownerId: string, dto: CreateUrlDTO): Promise<UrlResponseDTO> {
@@ -98,29 +125,62 @@ export class UrlService {
   }
 
   // Redis is a cache only: every failure is logged and falls back to the DB.
-  async redirect(shortCode: string): Promise<string> {
-    let url: string | null = null;
+  // The cached value is {id, url}: the click event needs the id, so a hit never touches the DB.
+  async redirect(shortCode: string, ctx: ClickContext): Promise<string> {
+    let hit: { id: number; url: string } | null = null;
     try {
-      url = await this.redis.get(cacheKey(shortCode));
+      const raw = await this.redis.get(cacheKey(shortCode));
+      // An entry from before click tracking is a bare URL: JSON.parse throws, so it is a miss.
+      if (raw) hit = JSON.parse(raw);
     } catch (err) {
-      console.error("Redis GET failed, falling back to DB:", err);
+      console.error("Redis GET failed or entry unreadable, falling back to DB:", err);
     }
 
-    if (!url) {
+    if (!hit) {
       const entity = await this.urlRepository.findByShortCode(shortCode);
       if (!entity) 
         throw new NotFoundError(`Short code "${shortCode}" not found`);
-      url = entity.url;
+      hit = { id: entity.id, url: entity.url };
       try {
-        await this.redis.set(cacheKey(shortCode), url, "EX", CACHE_TTL_SECONDS);
+        await this.redis.set(cacheKey(shortCode), JSON.stringify(hit), "EX", CACHE_TTL_SECONDS);
       } catch (err) {
         console.error("Redis SET failed:", err);
       }
     }
 
-    // A cache hit still has the shortCode, which is all this needs.
-    await this.urlRepository.incrementAccessCount(shortCode);
-    return url;
+    this.trackClick(hit.id, ctx);
+    return hit.url;
+  }
+
+  // Never awaited: the redirect must not wait on analytics. The worker (src/worker.ts) drains the queue
+  // into Postgres. The client IP is deliberately not part of the event.
+  // ponytail: clicks are dropped while Redis is down, upgrade to a local in-memory buffer or a direct DB fallback.
+  private trackClick(urlId: number, ctx: ClickContext): void {
+    const country = ctx.country?.toUpperCase();
+    const event = {
+      i: randomUUID(), // idempotency key: the worker can safely re-process an event
+      t: Date.now(),
+      u: urlId,
+      r: referrerHost(ctx.referer),
+      c: country && COUNTRY.test(country) ? country : null,
+      d: deviceClass(ctx.userAgent),
+    };
+    this.redis.lpush(CLICK_QUEUE, JSON.stringify(event)).catch((err) => console.error("Click enqueue failed:", err));
+  }
+
+  async getAnalytics(ownerId: string, shortCode: string, range: { from: string; to: string }): Promise<AnalyticsDTO> {
+    const entity = await this.urlRepository.findOwned(shortCode, ownerId);
+    if (!entity) 
+      throw new NotFoundError(`Short code "${shortCode}" not found`);
+
+    // The plan caps how far back a range may start; the clamped range is what the response reports.
+    const today = isoDay();
+    const floor = addDays(today, -PLANS[await getUserPlan(ownerId)].analyticsDays);
+    const from = range.from < floor ? floor : range.from;
+    const days = (Date.parse(range.to) - Date.parse(from)) / 86_400_000 + 1;
+    // Hourly detail needs raw rows: short range that still lies inside raw retention, else the rollup.
+    const hourly = days <= 7 && from > addDays(today, -RAW_CLICK_DAYS);
+    return this.clickRepository.analytics(entity.id, from, range.to, hourly ? "hour" : "day");
   }
 
   // Called after the DB write succeeds. ponytail: a concurrent miss can re-cache the old

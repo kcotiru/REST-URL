@@ -10,6 +10,7 @@ import express from "express";
 import type { Application } from "express";
 import type Redis from "ioredis";
 import { rateLimit } from "../src/middleware/rateLimit";
+import { addDays } from "../src/utils/date";
 import { errorHandler } from "../src/middleware/errorHandler";
 
 const TEST_DB = process.env.TEST_DATABASE_URL;
@@ -62,6 +63,7 @@ beforeAll(async () => {
     await pool.query(migration("001_init.sql"));
     await pool.query(migration("002_url_owner.sql"));
     await pool.query(migration("003_api_keys.sql"));
+    await pool.query(migration("004_clicks.sql"));
   }
 });
 
@@ -156,7 +158,7 @@ describe.skipIf(!TEST_DB)("with database", () => {
   const auth = async (id: string) => ({ Authorization: `Bearer ${await sign(id)}` });
 
   beforeEach(async () => {
-    await pool.query("TRUNCATE urls, api_keys");
+    await pool.query("TRUNCATE urls, api_keys, clicks, clicks_daily");
     await pool.query("INSERT INTO auth.users (id) VALUES ($1), ($2) ON CONFLICT DO NOTHING", [A, B]);
   });
 
@@ -198,7 +200,7 @@ describe.skipIf(!TEST_DB)("with database", () => {
       expect(await redis.exists(`url:${code}`)).toBe(0);
 
       await request(app).get(`/${code}`).expect(302).expect("Location", "https://example.com/a");
-      expect(await redis.get(`url:${code}`)).toBe("https://example.com/a");
+      expect(JSON.parse((await redis.get(`url:${code}`))!)).toEqual({ id: expect.any(Number), url: "https://example.com/a" });
 
       await request(app).put(`/api/v1/links/${code}`).set(h).send({ url: "https://example.com/b" }).expect(200);
       expect(await redis.exists(`url:${code}`)).toBe(0);
@@ -212,6 +214,158 @@ describe.skipIf(!TEST_DB)("with database", () => {
       const res = await request(app).post("/api/v1/links").set(await auth(A)).send({ url: "https://example.com/rl" }).expect(201);
       expect(res.headers["ratelimit-limit"]).toBe("60");
       expect(res.headers["ratelimit-remaining"]).toBe("59");
+    });
+  });
+
+  describe.skipIf(!TEST_REDIS)("click analytics", () => {
+    const IPHONE = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
+    const DESKTOP = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36";
+    const today = new Date().toISOString().slice(0, 10);
+    let flushOnce: (r: Redis, p: Pool) => Promise<number>;
+    beforeAll(async () => {
+      flushOnce = (await import("../src/worker")).flushOnce;
+    });
+
+    const link = async (id: string, url: string) =>
+      (await request(app).post("/api/v1/links").set(await auth(id)).send({ url }).expect(201)).body.data as { id: number; shortCode: string };
+    const hnClick = (code: string) =>
+      request(app).get(`/${code}`).set({ Referer: "https://news.ycombinator.com/item?id=1", "cf-ipcountry": "de", "User-Agent": IPHONE }).expect(302);
+    const event = (u: number) => ({ i: randomUUID(), t: Date.now(), u, r: null, c: null, d: "desktop" });
+    const counts = async () => ({
+      clicks: (await pool.query("SELECT count(*)::int AS n FROM clicks")).rows[0].n as number,
+      access: (await pool.query('SELECT "accessCount" AS n FROM urls ORDER BY id')).rows.map((r) => r.n as number),
+      daily: (await pool.query("SELECT coalesce(sum(count), 0)::int AS n FROM clicks_daily")).rows[0].n as number,
+    });
+
+    it("flush writes clicks, accessCount and the daily rollup, and empties both lists", async () => {
+      const a = await link(A, "https://example.com/a");
+      const b = await link(A, "https://example.com/b");
+      for (let i = 0; i < 3; i++) await hnClick(a.shortCode);
+      await request(app).get(`/${b.shortCode}`).set("User-Agent", DESKTOP).expect(302);
+      expect(await redis.llen("clicks:queue")).toBe(4);
+
+      expect(await flushOnce(redis, pool)).toBe(4);
+
+      const perLink = (await pool.query('SELECT "urlId", count(*)::int AS n FROM clicks GROUP BY 1 ORDER BY 1')).rows;
+      expect(perLink).toEqual([{ urlId: a.id, n: 3 }, { urlId: b.id, n: 1 }]);
+      const access = (await pool.query('SELECT id, "accessCount" FROM urls ORDER BY id')).rows;
+      expect(access).toEqual([{ id: a.id, accessCount: 3 }, { id: b.id, accessCount: 1 }]);
+      const daily = (await pool.query(`SELECT "urlId", to_char(day, 'YYYY-MM-DD') AS day, country, "referrerHost", device, count FROM clicks_daily ORDER BY 1`)).rows;
+      expect(daily).toEqual([
+        { urlId: a.id, day: today, country: "DE", referrerHost: "news.ycombinator.com", device: "mobile", count: 3 },
+        { urlId: b.id, day: today, country: "", referrerHost: "", device: "desktop", count: 1 },
+      ]);
+      expect(await redis.llen("clicks:queue")).toBe(0);
+      expect(await redis.llen("clicks:processing")).toBe(0);
+    });
+
+    it("is idempotent: duplicate events in a batch and a replay after a crash between COMMIT and DEL do not double-count", async () => {
+      const a = await link(A, "https://example.com/a");
+      const ev = JSON.stringify(event(a.id));
+      await redis.lpush("clicks:queue", ev, ev); // same event twice in one batch
+      expect(await flushOnce(redis, pool)).toBe(2);
+      expect(await counts()).toEqual({ clicks: 1, access: [1], daily: 1 });
+
+      await redis.lpush("clicks:processing", ev); // crashed after COMMIT, before DEL
+      expect(await flushOnce(redis, pool)).toBe(1);
+      expect(await counts()).toEqual({ clicks: 1, access: [1], daily: 1 });
+    });
+
+    it("re-processes a leftover processing list before moving anything new, losing nothing", async () => {
+      const a = await link(A, "https://example.com/a");
+      await redis.lpush("clicks:processing", JSON.stringify(event(a.id)), JSON.stringify(event(a.id)));
+      await redis.lpush("clicks:queue", JSON.stringify(event(a.id)), JSON.stringify(event(a.id)), JSON.stringify(event(a.id)));
+
+      expect(await flushOnce(redis, pool)).toBe(2);
+      expect(await redis.llen("clicks:queue")).toBe(3); // untouched until recovery is done
+      expect((await counts()).clicks).toBe(2);
+
+      expect(await flushOnce(redis, pool)).toBe(3);
+      expect(await counts()).toEqual({ clicks: 5, access: [5], daily: 5 });
+      expect(await redis.llen("clicks:processing")).toBe(0);
+    });
+
+    it("drops events of a deleted link and still lands the rest of the batch", async () => {
+      const gone = await link(A, "https://example.com/gone");
+      const kept = await link(A, "https://example.com/kept");
+      await request(app).get(`/${gone.shortCode}`).expect(302);
+      await request(app).delete(`/api/v1/links/${gone.shortCode}`).set(await auth(A)).expect(204);
+      await request(app).get(`/${kept.shortCode}`).expect(302);
+
+      expect(await flushOnce(redis, pool)).toBe(2);
+      const rows = (await pool.query('SELECT "urlId" FROM clicks')).rows;
+      expect(rows).toEqual([{ urlId: kept.id }]);
+      expect((await counts()).access).toEqual([1]);
+      expect(await redis.llen("clicks:processing")).toBe(0);
+    });
+
+    it("skips a malformed event without poisoning the batch", async () => {
+      const a = await link(A, "https://example.com/a");
+      await redis.lpush("clicks:queue", "{not json", JSON.stringify(event(a.id)));
+      expect(await flushOnce(redis, pool)).toBe(2);
+      expect((await counts()).clicks).toBe(1);
+    });
+
+    it("the redirect only enqueues: no DB write before the flush, compact event, no IP", async () => {
+      const a = await link(A, "https://example.com/a");
+      await hnClick(a.shortCode);
+      await request(app).get(`/${a.shortCode}`).set({ "x-vercel-ip-country": "zz1", "User-Agent": "Googlebot/2.1" }).expect(302);
+
+      expect((await counts()).access).toEqual([0]);
+      const raw = await redis.lrange("clicks:queue", 0, -1);
+      expect(raw).toHaveLength(2);
+      for (const r of raw) {
+        expect(Object.keys(JSON.parse(r)).sort()).toEqual(["c", "d", "i", "r", "t", "u"]);
+        expect(r).not.toMatch(/127\.0\.0\.1|::1/);
+      }
+      const [bot, human] = raw.map((r) => JSON.parse(r)); // LPUSH: newest first
+      expect(human).toMatchObject({ u: a.id, r: "news.ycombinator.com", c: "DE", d: "mobile" });
+      expect(bot).toMatchObject({ c: null, r: null, d: "bot" }); // "ZZ1" is not a country code
+    });
+
+    it("analytics: hourly for a short range, daily from the rollup for a long one, plan-clamped, owner-scoped, validated", async () => {
+      const a = await link(A, "https://example.com/a");
+      for (let i = 0; i < 3; i++) await hnClick(a.shortCode);
+      await flushOnce(redis, pool);
+      const get = async (id: string, code: string, qs = "", status = 200) => {
+        const res = await request(app).get(`/api/v1/links/${code}/analytics${qs}`).set(await auth(id));
+        expect(res.status, JSON.stringify(res.body)).toBe(status);
+        return res;
+      };
+      const sum = (s: { count: number }[]) => s.reduce((n, x) => n + x.count, 0);
+
+      const week = (await get(A, a.shortCode)).body.data;
+      expect(week).toMatchObject({
+        to: today, granularity: "hour", total: 3,
+        countries: [{ value: "DE", count: 3 }],
+        referrers: [{ value: "news.ycombinator.com", count: 3 }],
+        devices: [{ value: "mobile", count: 3 }],
+      });
+      expect(week.series).toHaveLength(7 * 24);
+      expect(sum(week.series)).toBe(3);
+
+      const month = (await get(A, a.shortCode, `?from=${addDays(today, -29)}&to=${today}`)).body.data;
+      expect(month).toMatchObject({ granularity: "day", total: 3, countries: [{ value: "DE", count: 3 }] });
+      expect(month.series).toHaveLength(30);
+      expect(sum(month.series)).toBe(3);
+      expect(month.series.at(-1)).toEqual({ t: today, count: 3 });
+
+      // The free plan reaches back 30 days: the 40-day-old rollup row is out of range and `from` is clamped.
+      await pool.query(`INSERT INTO clicks_daily ("urlId", day, device, count) VALUES ($1, $2, 'desktop', 9)`, [a.id, addDays(today, -40)]);
+      const clamped = (await get(A, a.shortCode, `?from=${addDays(today, -60)}&to=${today}`)).body.data;
+      expect(clamped).toMatchObject({ from: addDays(today, -30), granularity: "day", total: 3 });
+
+      // Unknown country/referrer come back as null.
+      const b = await link(A, "https://example.com/b");
+      await request(app).get(`/${b.shortCode}`).expect(302);
+      await flushOnce(redis, pool);
+      expect((await get(A, b.shortCode)).body.data).toMatchObject({ total: 1, countries: [{ value: null, count: 1 }], referrers: [{ value: null, count: 1 }], devices: [{ value: "desktop", count: 1 }] });
+
+      await get(B, a.shortCode, "", 404);
+      await get(A, a.shortCode, `?from=${today}&to=${addDays(today, -1)}`, 400);
+      await get(A, a.shortCode, "?from=2026-02-30", 400);
+      await get(A, a.shortCode, "?to=2026-13-45", 400);
+      await get(A, a.shortCode, "?from=yesterday", 400);
     });
   });
 
