@@ -87,6 +87,14 @@ afterAll(async () => {
   if (TEST_DB) await pool.end();
 });
 
+// The DB and Redis suites skip when their env is missing; in CI that must fail the run, not hide it.
+it("CI provides TEST_DATABASE_URL and TEST_REDIS_URL", () => {
+  if (process.env.CI) {
+    expect(TEST_DB, "TEST_DATABASE_URL").toBeTruthy();
+    expect(TEST_REDIS, "TEST_REDIS_URL").toBeTruthy();
+  }
+});
+
 it("GET /health returns 200", async () => {
   await request(app).get("/health").expect(200);
 });
@@ -252,6 +260,14 @@ describe.skipIf(!TEST_DB)("with database", () => {
 
       await request(app).delete(`/api/v1/links/${code}`).set(h).expect(204);
       await request(app).get(`/${code}`).expect(404);
+    });
+
+    it("a redirect after an update serves the new URL, even when the old one was cached", async () => {
+      const h = await auth(A);
+      const { shortCode: code } = (await request(app).post("/api/v1/links").set(h).send({ url: "https://example.com/old" }).expect(201)).body.data;
+      await request(app).get(`/${code}`).expect(302).expect("Location", "https://example.com/old"); // caches it
+      await request(app).put(`/api/v1/links/${code}`).set(h).send({ url: "https://example.com/new" }).expect(200);
+      await request(app).get(`/${code}`).expect(302).expect("Location", "https://example.com/new");
     });
 
     it("API requests carry the free-plan rate limit headers", async () => {
