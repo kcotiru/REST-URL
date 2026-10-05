@@ -31,7 +31,7 @@ Needs Node 20+, Docker, a Supabase project (Auth + Postgres); for billing, the S
 ```bash
 docker compose up -d     # Redis 7 :6379 (app + tests); Postgres 16 :54329 (tests/bench only)
 cp backend/.env.example backend/.env && cp frontend/.env.example frontend/.env   # then fill in
-for f in backend/db/migrations/*.sql; do psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"; done  # 001-006
+for f in backend/db/migrations/*.sql; do psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"; done  # 001-007
 (cd backend && npm install && npm run dev)     # API :3000
 (cd backend && npm run worker)                 # click worker (needs Redis; run one)
 (cd frontend && npm install && npm run dev)    # app :5173, /api proxied to :3000

@@ -75,6 +75,7 @@ beforeAll(async () => {
     await pool.query(migration("004_clicks.sql"));
     await pool.query(migration("005_billing.sql"));
     await pool.query(migration("006_enable_rls.sql"));
+    await pool.query(migration("007_drop_redundant_shortcode_index.sql"));
   }
 });
 
@@ -672,7 +673,7 @@ describe.skipIf(!TEST_DB)("with database", () => {
         pool.query(
           `INSERT INTO urls (url, "shortCode", "ownerId", "createdAt")
            SELECT 'https://example.com/' || g, $1::text || g, $2, ${createdAt} FROM generate_series(1, $3::int) g`,
-          [`${n}x${randomUUID().slice(0, 4)}`, userId, n],
+          [randomUUID().slice(0, 5), userId, n], // prefix + up to 4 digits must fit varchar(10)
         );
       const create = async (id: string) => request(app).post("/api/v1/links").set(await auth(id)).send({ url: "https://example.com/new" });
 

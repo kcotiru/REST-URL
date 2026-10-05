@@ -8,7 +8,7 @@
 // Run the backend with REDIRECT_LIMIT_PER_MIN set high, or the per-IP limiter answers 429.
 //
 // To reproduce: start the compose services, create a database (the run used urlshortener_bench, 400,001 links),
-// apply migrations 001-006 (with a stub auth.users, see backend/test/api.test.ts), seed with generate_series
+// apply migrations 001-007 (with a stub auth.users, see backend/test/api.test.ts), seed with generate_series
 // (cached0001, k0000001..k0300000 measured, w0000001..w0100000 warmup), start the compiled backend (dist/) with
 // REDIRECT_LIMIT_PER_MIN=100000000 and PORT/REDIS_URL/DATABASE_URL pointing at the bench database, then run
 //   BENCH_URL=http://localhost:<port> REDIS_URL=<same redis, e.g. a dedicated DB like /13> npm run bench
