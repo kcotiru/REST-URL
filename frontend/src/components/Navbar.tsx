@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Zap, Menu, X } from 'lucide-react'
+import { supabase, useSession } from '../lib/supabase'
 
 const links = [
   { to: '/', label: 'Home' },
@@ -12,6 +13,7 @@ export default function Navbar() {
   const { pathname } = useLocation()
   const [scrolled, setScrolled] = useState(false)
   const [open, setOpen] = useState(false)
+  const session = useSession()
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20)
@@ -54,13 +56,26 @@ export default function Navbar() {
               {label}
             </Link>
           ))}
-          <Link
-            to="/shorten"
-            className="ml-3 px-4 py-2 bg-accent text-surface rounded-lg text-sm 
-            font-medium hover:bg-accent-dim transition-colors font-body"
-          >
-            Get Started
-          </Link>
+          {session ? (
+            <div className="ml-3 flex items-center gap-3">
+              <span className="text-sm text-text-secondary font-body max-w-[12rem] truncate">{session.user.email}</span>
+              <button
+                onClick={() => supabase.auth.signOut()}
+                className="px-4 py-2 border border-surface-border text-text-secondary rounded-lg text-sm
+                font-medium hover:text-text-primary hover:bg-surface-high transition-colors font-body"
+              >
+                Log out
+              </button>
+            </div>
+          ) : (
+            <Link
+              to="/login"
+              className="ml-3 px-4 py-2 bg-accent text-surface rounded-lg text-sm
+              font-medium hover:bg-accent-dim transition-colors font-body"
+            >
+              Log in
+            </Link>
+          )}
         </div>
 
         {/* Mobile toggle */}
@@ -90,6 +105,23 @@ export default function Navbar() {
               {label}
             </Link>
           ))}
+          {session ? (
+            <button
+              onClick={() => { supabase.auth.signOut(); setOpen(false) }}
+              className="px-4 py-2.5 rounded-lg text-sm font-medium text-left text-text-secondary
+              hover:text-text-primary transition-colors"
+            >
+              Log out ({session.user.email})
+            </button>
+          ) : (
+            <Link
+              to="/login"
+              onClick={() => setOpen(false)}
+              className="px-4 py-2.5 rounded-lg text-sm font-medium text-accent"
+            >
+              Log in
+            </Link>
+          )}
         </div>
       )}
     </nav>

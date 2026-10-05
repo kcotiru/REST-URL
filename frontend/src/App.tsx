@@ -1,9 +1,17 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { useSession } from './lib/supabase'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
 import HomePage from './pages/HomePage'
 import ShortenPage from './pages/ShortenPage'
 import StatsPage from './pages/StatsPage'
+import LoginPage from './pages/LoginPage'
+
+function RequireAuth({ children }: { children: JSX.Element }) {
+  const session = useSession()
+  if (session === undefined) return null
+  return session ? children : <Navigate to="/login" replace />
+}
 
 export default function App() {
   return (
@@ -13,8 +21,9 @@ export default function App() {
         <main className="flex-1">
           <Routes>
             <Route path="/" element={<HomePage />} />
-            <Route path="/shorten" element={<ShortenPage />} />
-            <Route path="/stats" element={<StatsPage />} />
+            <Route path="/shorten" element={<RequireAuth><ShortenPage /></RequireAuth>} />
+            <Route path="/stats" element={<RequireAuth><StatsPage /></RequireAuth>} />
+            <Route path="/login" element={<LoginPage />} />
           </Routes>
         </main>
         <Footer />

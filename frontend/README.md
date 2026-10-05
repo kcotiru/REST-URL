@@ -106,8 +106,8 @@ cp .env.example .env
 ```
 
 ```env
-# Only needed if you change the backend port
-VITE_API_URL=http://localhost:3000
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 ```
 
 The Vite proxy is configured in `vite.config.ts` and handles API routing automatically in development — you typically don't need to change anything.

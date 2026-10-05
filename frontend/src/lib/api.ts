@@ -1,4 +1,11 @@
+import { supabase } from './supabase'
+
 const BASE = '/api/v1'
+
+async function authHeaders(): Promise<Record<string, string>> {
+  const { data } = await supabase.auth.getSession()
+  return data.session ? { Authorization: `Bearer ${data.session.access_token}` } : {}
+}
 
 export interface UrlRecord {
   id: number
@@ -14,8 +21,8 @@ export interface UrlStats extends UrlRecord {
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
     ...options,
+    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
   })
   const json = await res.json()
   if (!res.ok) throw new Error(json.message || 'Request failed')
@@ -39,7 +46,7 @@ export const api = {
     }),
 
   delete: async (code: string) => {
-    const res = await fetch(`${BASE}/links/${code}`, { method: 'DELETE' })
+    const res = await fetch(`${BASE}/links/${code}`, { method: 'DELETE', headers: await authHeaders() })
     if (!res.ok) {
       const json = await res.json()
       throw new Error(json.message || 'Delete failed')
