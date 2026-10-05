@@ -6,11 +6,11 @@ import {
 import { useState } from 'react'
 
 const endpoints = [
-  { method: 'POST', path: '/shorten', desc: 'Create a short URL', color: 'text-emerald-400 bg-emerald-400/10' },
-  { method: 'GET', path: '/shorten/:code', desc: 'Retrieve URL metadata', color: 'text-sky-400 bg-sky-400/10' },
-  { method: 'PUT', path: '/shorten/:code', desc: 'Update destination URL', color: 'text-amber-400 bg-amber-400/10' },
-  { method: 'DELETE', path: '/shorten/:code', desc: 'Remove a short URL', color: 'text-rose-400 bg-rose-400/10' },
-  { method: 'GET', path: '/shorten/:code/stats', desc: 'Access counts & timestamps', color: 'text-sky-400 bg-sky-400/10' },
+  { method: 'POST', path: '/api/v1/links', desc: 'Create a short URL', color: 'text-emerald-400 bg-emerald-400/10' },
+  { method: 'GET', path: '/api/v1/links/:code', desc: 'Retrieve URL metadata', color: 'text-sky-400 bg-sky-400/10' },
+  { method: 'PUT', path: '/api/v1/links/:code', desc: 'Update destination URL', color: 'text-amber-400 bg-amber-400/10' },
+  { method: 'DELETE', path: '/api/v1/links/:code', desc: 'Remove a short URL', color: 'text-rose-400 bg-rose-400/10' },
+  { method: 'GET', path: '/api/v1/links/:code/stats', desc: 'Access counts & timestamps', color: 'text-sky-400 bg-sky-400/10' },
 ]
 
 const features = [
@@ -194,7 +194,7 @@ export default function HomePage() {
             <div className="px-4 py-3 border-b border-surface-border flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-mono bg-emerald-400/10 text-emerald-400 px-2 py-0.5 rounded">POST</span>
-                <span className="text-xs font-mono text-text-muted">/shorten</span>
+                <span className="text-xs font-mono text-text-muted">/api/v1/links</span>
               </div>
               <CopyButton text={`{"url":"https://example.com/very/long/path","customCode":"mylink"}`} />
             </div>

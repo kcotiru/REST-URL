@@ -1,4 +1,4 @@
-const BASE = '/api'
+const BASE = '/api/v1'
 
 export interface UrlRecord {
   id: number
@@ -24,22 +24,22 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   shorten: (url: string, customCode?: string) =>
-    request<UrlRecord>('/shorten', {
+    request<UrlRecord>('/links', {
       method: 'POST',
       body: JSON.stringify({ url, ...(customCode ? { customCode } : {}) }),
     }),
 
   get: (code: string) =>
-    request<UrlRecord>(`/shorten/${code}`),
+    request<UrlRecord>(`/links/${code}`),
 
   update: (code: string, url: string) =>
-    request<UrlRecord>(`/shorten/${code}`, {
+    request<UrlRecord>(`/links/${code}`, {
       method: 'PUT',
       body: JSON.stringify({ url }),
     }),
 
   delete: async (code: string) => {
-    const res = await fetch(`${BASE}/shorten/${code}`, { method: 'DELETE' })
+    const res = await fetch(`${BASE}/links/${code}`, { method: 'DELETE' })
     if (!res.ok) {
       const json = await res.json()
       throw new Error(json.message || 'Delete failed')
@@ -47,5 +47,5 @@ export const api = {
   },
 
   stats: (code: string) =>
-    request<UrlStats>(`/shorten/${code}/stats`),
+    request<UrlStats>(`/links/${code}/stats`),
 }

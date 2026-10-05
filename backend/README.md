@@ -77,9 +77,9 @@ npm run build && npm start
 
 ## API Endpoints
 
-All endpoints are prefixed with `/shorten`.
+All endpoints are prefixed with `/api/v1/links`.
 
-### `POST /shorten`
+### `POST /api/v1/links`
 Create a short URL.
 
 **Request body:**
@@ -105,7 +105,7 @@ Create a short URL.
 
 ---
 
-### `GET /shorten/:code`
+### `GET /api/v1/links/:code`
 Retrieve metadata for a short code.
 
 **Response `200`:** same shape as above.  
@@ -113,7 +113,7 @@ Retrieve metadata for a short code.
 
 ---
 
-### `PUT /shorten/:code`
+### `PUT /api/v1/links/:code`
 Update the destination URL of an existing short code.
 
 **Request body:**
@@ -126,7 +126,7 @@ Update the destination URL of an existing short code.
 
 ---
 
-### `DELETE /shorten/:code`
+### `DELETE /api/v1/links/:code`
 Remove a short URL mapping.
 
 **Response `204`** — no content.  
@@ -134,7 +134,7 @@ Remove a short URL mapping.
 
 ---
 
-### `GET /shorten/:code/stats`
+### `GET /api/v1/links/:code/stats`
 Get access count and timestamps.
 
 **Response `200`:**

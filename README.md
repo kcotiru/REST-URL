@@ -93,7 +93,7 @@ Each sub-project has its own detailed README:
 ```json
 {
   "rewrites": [
-    { "source": "/api/:path*", "destination": "https://your-backend.com/:path*" }
+    { "source": "/api/:path*", "destination": "https://your-backend.com/api/:path*" }
   ]
 }
 ```

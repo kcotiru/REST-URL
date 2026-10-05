@@ -25,11 +25,11 @@ const createApp = (): Application => {
   const urlController = new UrlController(urlService);
 
   // ── Routes ─────────────────────────────────────────────────────────────────
-  app.use("/shorten", createUrlRouter(urlController));
-  app.get("/:code", validate(shortCodeParamSchema, "params"), urlController.redirect);
   app.get("/health", (_req: Request, res: Response) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
+  app.use("/api/v1/links", createUrlRouter(urlController));
+  app.get("/:code", validate(shortCodeParamSchema, "params"), urlController.redirect);
   
   app.use(errorHandler);
 
