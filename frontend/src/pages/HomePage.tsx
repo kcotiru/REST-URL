@@ -6,11 +6,16 @@ import {
 import { useState } from 'react'
 
 const endpoints = [
-  { method: 'POST', path: '/shorten', desc: 'Create a short URL', color: 'text-emerald-400 bg-emerald-400/10' },
-  { method: 'GET', path: '/shorten/:code', desc: 'Retrieve URL metadata', color: 'text-sky-400 bg-sky-400/10' },
-  { method: 'PUT', path: '/shorten/:code', desc: 'Update destination URL', color: 'text-amber-400 bg-amber-400/10' },
-  { method: 'DELETE', path: '/shorten/:code', desc: 'Remove a short URL', color: 'text-rose-400 bg-rose-400/10' },
-  { method: 'GET', path: '/shorten/:code/stats', desc: 'Access counts & timestamps', color: 'text-sky-400 bg-sky-400/10' },
+  { method: 'POST', path: '/api/v1/links', desc: 'Create a short URL', color: 'text-emerald-400 bg-emerald-400/10' },
+  { method: 'GET', path: '/api/v1/links/:code', desc: 'Retrieve URL metadata', color: 'text-sky-400 bg-sky-400/10' },
+  { method: 'PUT', path: '/api/v1/links/:code', desc: 'Update destination URL', color: 'text-amber-400 bg-amber-400/10' },
+  { method: 'DELETE', path: '/api/v1/links/:code', desc: 'Remove a short URL', color: 'text-rose-400 bg-rose-400/10' },
+  { method: 'GET', path: '/api/v1/links', desc: 'List your links with click counts', color: 'text-sky-400 bg-sky-400/10' },
+  { method: 'GET', path: '/api/v1/links/:code/analytics', desc: 'Clicks over time, countries, referrers, devices', color: 'text-sky-400 bg-sky-400/10' },
+  { method: 'POST', path: '/api/v1/keys', desc: 'Create an API key (shown once)', color: 'text-emerald-400 bg-emerald-400/10' },
+  { method: 'DELETE', path: '/api/v1/keys/:id', desc: 'Revoke an API key', color: 'text-rose-400 bg-rose-400/10' },
+  { method: 'GET', path: '/api/v1/billing', desc: 'Plan, status and monthly usage', color: 'text-sky-400 bg-sky-400/10' },
+  { method: 'GET', path: '/api/v1/plans', desc: 'Public plan limits and pricing', color: 'text-sky-400 bg-sky-400/10' },
 ]
 
 const features = [
@@ -21,8 +26,8 @@ const features = [
   },
   {
     icon: BarChart3,
-    title: 'Access Analytics',
-    desc: 'Track every redirect. Get access counts, creation dates, and update timestamps per code.',
+    title: 'Click Analytics',
+    desc: 'Clicks over time, plus top countries, referrers and devices for every link.',
   },
   {
     icon: Pencil,
@@ -31,8 +36,8 @@ const features = [
   },
   {
     icon: Trash2,
-    title: 'Full CRUD Control',
-    desc: 'Create, read, update and delete short URLs programmatically through a clean REST interface.',
+    title: 'API Keys',
+    desc: 'Create revocable keys to call the API from scripts and CI. Each is shown once and stored hashed.',
   },
   {
     icon: Lock,
@@ -45,6 +50,14 @@ const features = [
     desc: 'PostgreSQL index on shortCode ensures constant-time redirects regardless of table size.',
   },
 ]
+
+const sampleRequest = `Authorization: Bearer ru_live_…
+Content-Type: application/json
+
+{
+  "url": "https://example.com/very/long/path",
+  "customCode": "mylink"
+}`
 
 const sampleResponse = `{
   "status": "success",
@@ -106,24 +119,24 @@ export default function HomePage() {
           <p className="font-body text-text-secondary text-lg md:text-xl max-w-2xl mx-auto leading-relaxed mb-10 
           opacity-0-init animate-fade-up stagger-2"
           >
-            A clean, fast REST API to shorten URLs, track access stats, and manage links programmatically.
-            No signup required. Just hit the endpoint.
+            A clean, fast REST API to shorten URLs, track clicks, and manage links programmatically.
+            Sign up free: 50 links a month, no card needed.
           </p>
 
           <div className="flex items-center justify-center gap-4 flex-wrap opacity-0-init animate-fade-up stagger-3">
             <Link
-              to="/shorten"
+              to="/dashboard"
               className="flex items-center gap-2 px-6 py-3 bg-accent text-surface rounded-xl font-medium 
               hover:bg-accent-dim transition-all hover:scale-105 active:scale-95 glow-accent-sm font-body"
             >
-              Try It Now <ArrowRight className="w-4 h-4" />
+              Open Dashboard <ArrowRight className="w-4 h-4" />
             </Link>
             <Link
-              to="/stats"
+              to="/pricing"
               className="flex items-center gap-2 px-6 py-3 bg-surface-high border border-surface-border 
               text-text-primary rounded-xl font-medium hover:border-accent/30 transition-all font-body"
             >
-              View Stats <BarChart3 className="w-4 h-4" />
+              See Pricing <BarChart3 className="w-4 h-4" />
             </Link>
           </div>
 
@@ -131,7 +144,7 @@ export default function HomePage() {
           <div className="flex items-center justify-center gap-8 mt-14 flex-wrap opacity-0-init animate-fade-up 
           stagger-4"
           >
-            {[['5', 'Endpoints'], ['O(1)', 'Lookups'], ['10', 'Char limit'], ['Supabase', 'Powered']].map(([val, lbl]) => (
+            {[['10', 'Endpoints'], ['O(1)', 'Lookups'], ['50', 'Free links / mo'], ['Stripe', 'Billing']].map(([val, lbl]) => (
               <div key={lbl} className="text-center">
                 <div className="font-display font-bold text-2xl text-accent">{val}</div>
                 <div className="text-xs text-text-muted font-mono uppercase tracking-wider mt-0.5">{lbl}</div>
@@ -149,7 +162,7 @@ export default function HomePage() {
             <span className="font-mono text-xs text-accent uppercase tracking-widest">API Reference</span>
           </div>
           <h2 className="font-display text-3xl md:text-4xl font-bold text-text-primary mb-12">
-            Five endpoints. Full control.
+            Links, analytics, keys and billing.
           </h2>
 
           <div className="space-y-2">
@@ -182,10 +195,10 @@ export default function HomePage() {
             <p className="text-text-secondary font-body leading-relaxed mb-6">
               POST a URL — optionally with a custom code — and get back a structured JSON response with your short code, timestamps, and ID.
             </p>
-            <Link to="/shorten" className="inline-flex items-center gap-2 text-accent text-sm font-medium hover:gap-3 
+            <Link to="/dashboard" className="inline-flex items-center gap-2 text-accent text-sm font-medium hover:gap-3 
             transition-all font-body"
             >
-              Open the shortener <ArrowRight className="w-4 h-4" />
+              Open the dashboard <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
 
@@ -194,17 +207,12 @@ export default function HomePage() {
             <div className="px-4 py-3 border-b border-surface-border flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-mono bg-emerald-400/10 text-emerald-400 px-2 py-0.5 rounded">POST</span>
-                <span className="text-xs font-mono text-text-muted">/shorten</span>
+                <span className="text-xs font-mono text-text-muted">/api/v1/links</span>
               </div>
-              <CopyButton text={`{"url":"https://example.com/very/long/path","customCode":"mylink"}`} />
+              <CopyButton text={sampleRequest} />
             </div>
-            <pre className="px-4 py-4 text-xs font-mono text-text-secondary border-b border-surface-border 
-            overflow-x-auto"
-            >
-              {`{
-                "url": "https://example.com/very/long/path",
-                "customCode": "mylink"
-              }`}
+            <pre className="px-4 py-4 text-xs font-mono text-text-secondary border-b border-surface-border overflow-x-auto">
+              {sampleRequest}
             </pre>
 
             {/* Response */}
@@ -268,10 +276,10 @@ export default function HomePage() {
             <span className="text-gradient">your first URL?</span>
           </h2>
           <p className="text-text-secondary font-body mb-10">
-            Start using the REST URL API in seconds. No auth required — just call the endpoint.
+            Create a free account and start using the REST URL API in seconds.
           </p>
           <Link
-            to="/shorten"
+            to="/dashboard"
             className="inline-flex items-center gap-2 px-8 py-4 bg-accent text-surface rounded-xl font-semibold 
             text-lg hover:bg-accent-dim transition-all hover:scale-105 active:scale-95 glow-accent font-body"
           >

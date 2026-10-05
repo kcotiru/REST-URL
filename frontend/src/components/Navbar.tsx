@@ -1,17 +1,24 @@
 import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Zap, Menu, X } from 'lucide-react'
+import { supabase, useSession } from '../lib/supabase'
 
-const links = [
+const publicLinks = [
   { to: '/', label: 'Home' },
-  { to: '/shorten', label: 'Shorten' },
-  { to: '/stats', label: 'Stats' },
+  { to: '/pricing', label: 'Pricing' },
+]
+const authLinks = [
+  { to: '/dashboard', label: 'Dashboard' },
+  { to: '/keys', label: 'API keys' },
+  { to: '/billing', label: 'Billing' },
 ]
 
 export default function Navbar() {
   const { pathname } = useLocation()
   const [scrolled, setScrolled] = useState(false)
   const [open, setOpen] = useState(false)
+  const session = useSession()
+  const links = session ? [...publicLinks.slice(0, 1), ...authLinks, ...publicLinks.slice(1)] : publicLinks
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20)
@@ -39,7 +46,7 @@ export default function Navbar() {
         </Link>
 
         {/* Desktop nav */}
-        <div className="hidden md:flex items-center gap-1">
+        <div className="hidden lg:flex items-center gap-1">
           {links.map(({ to, label }) => (
             <Link
               key={to}
@@ -54,19 +61,35 @@ export default function Navbar() {
               {label}
             </Link>
           ))}
-          <Link
-            to="/shorten"
-            className="ml-3 px-4 py-2 bg-accent text-surface rounded-lg text-sm 
-            font-medium hover:bg-accent-dim transition-colors font-body"
-          >
-            Get Started
-          </Link>
+          {session ? (
+            <div className="ml-3 flex items-center gap-3">
+              <span className="text-sm text-text-secondary font-body max-w-[12rem] truncate">{session.user.email}</span>
+              <button
+                onClick={() => supabase.auth.signOut()}
+                className="px-4 py-2 border border-surface-border text-text-secondary rounded-lg text-sm
+                font-medium hover:text-text-primary hover:bg-surface-high transition-colors font-body"
+              >
+                Log out
+              </button>
+            </div>
+          ) : (
+            <Link
+              to="/login"
+              className="ml-3 px-4 py-2 bg-accent text-surface rounded-lg text-sm
+              font-medium hover:bg-accent-dim transition-colors font-body"
+            >
+              Log in
+            </Link>
+          )}
         </div>
 
         {/* Mobile toggle */}
         <button
-          className="md:hidden text-text-secondary hover:text-text-primary"
+          className="lg:hidden text-text-secondary hover:text-text-primary p-1 rounded focus:outline-none
+          focus-visible:ring-2 focus-visible:ring-accent/60"
           onClick={() => setOpen(!open)}
+          aria-label={open ? 'Close menu' : 'Open menu'}
+          aria-expanded={open}
         >
           {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>
@@ -74,7 +97,7 @@ export default function Navbar() {
 
       {/* Mobile menu */}
       {open && (
-        <div className="md:hidden bg-surface-raised border-b border-surface-border 
+        <div className="lg:hidden bg-surface-raised border-b border-surface-border 
         px-6 py-4 flex flex-col gap-2">
           {links.map(({ to, label }) => (
             <Link
@@ -90,6 +113,23 @@ export default function Navbar() {
               {label}
             </Link>
           ))}
+          {session ? (
+            <button
+              onClick={() => { supabase.auth.signOut(); setOpen(false) }}
+              className="px-4 py-2.5 rounded-lg text-sm font-medium text-left text-text-secondary
+              hover:text-text-primary transition-colors"
+            >
+              Log out ({session.user.email})
+            </button>
+          ) : (
+            <Link
+              to="/login"
+              onClick={() => setOpen(false)}
+              className="px-4 py-2.5 rounded-lg text-sm font-medium text-accent"
+            >
+              Log in
+            </Link>
+          )}
         </div>
       )}
     </nav>
