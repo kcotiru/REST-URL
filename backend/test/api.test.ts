@@ -74,6 +74,7 @@ beforeAll(async () => {
     await pool.query(migration("003_api_keys.sql"));
     await pool.query(migration("004_clicks.sql"));
     await pool.query(migration("005_billing.sql"));
+    await pool.query(migration("006_enable_rls.sql"));
   }
 });
 
@@ -217,6 +218,23 @@ describe.skipIf(!TEST_DB)("with database", () => {
     const row = await pool.query(`SELECT "url" FROM urls WHERE "shortCode" = $1`, [code]);
     expect(row.rows).toHaveLength(1);
     expect(row.rows[0].url).toBe("https://example.com/a");
+  });
+
+  it("RLS: a non-owner role sees no rows in urls, while the owner connection still does", async () => {
+    await pool.query(`DO $$ BEGIN CREATE ROLE rls_probe NOLOGIN; EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+    await pool.query("GRANT SELECT ON urls TO rls_probe");
+    await request(app).post("/api/v1/links").set(await auth(A)).send({ url: "https://example.com/rls" }).expect(201);
+
+    const client = await pool.connect();
+    try {
+      await client.query("SET ROLE rls_probe");
+      expect((await client.query("SELECT count(*)::int AS n FROM urls")).rows[0].n).toBe(0);
+      await client.query("RESET ROLE");
+      expect((await client.query("SELECT count(*)::int AS n FROM urls")).rows[0].n).toBeGreaterThanOrEqual(1);
+    } finally {
+      await client.query("RESET ROLE").catch(() => undefined);
+      client.release();
+    }
   });
 
   it("GET /links lists only the caller's links, newest first, with accessCount", async () => {
