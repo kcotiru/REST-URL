@@ -57,6 +57,7 @@ export class UrlController {
   redirect = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const targetUrl = await this.urlService.redirect(req.params.code);
+      // 302, not 301: browsers cache a 301 permanently, which would hide repeat clicks from analytics and ignore link edits.
       res.redirect(302, targetUrl);
     } catch (err) {
       next(err);
