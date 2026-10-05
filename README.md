@@ -81,7 +81,28 @@ Each sub-project has its own detailed README:
 
 Run `psql "$DATABASE_URL" -f backend/db/migrations/002_url_owner.sql` after `001_init.sql` (adds `urls."ownerId"`; existing links become read-only legacy rows).
 
+Run `psql "$DATABASE_URL" -f backend/db/migrations/003_api_keys.sql` next (adds the `api_keys` table; only SHA-256 hashes of keys are stored).
+
 Tests: `docker compose up -d`, then `TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:54329/urlshortener_test npm test` in `backend/` (DB tests skip without it).
+
+---
+
+## API keys
+
+Create keys with a Supabase session JWT, then use them as Bearer tokens on `/api/v1/links`. Keys are `ru_live_` + 43 random chars, shown **once** in the create response.
+
+| Method | Path | Notes |
+|---|---|---|
+| `POST` | `/api/v1/keys` | body `{ "name": "ci" }` (1-64 chars) -> `201 { id, name, prefix, createdAt, key }` |
+| `GET` | `/api/v1/keys` | your keys, newest first (`id, name, prefix, createdAt, lastUsedAt, revokedAt`) |
+| `DELETE` | `/api/v1/keys/:id` | revokes (soft); `204`, or `404` if not yours / already revoked |
+
+Key management is JWT-session only: an API key calling `/api/v1/keys` gets `403`.
+
+```bash
+curl -H "Authorization: Bearer ru_live_…" -H "Content-Type: application/json" \
+  -X POST http://localhost:3000/api/v1/links -d '{"url":"https://example.com"}'
+```
 
 ---
 

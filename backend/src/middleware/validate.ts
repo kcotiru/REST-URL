@@ -43,3 +43,11 @@ export const shortCodeParamSchema = z.object({
     .max(10)
     .regex(/^[A-Za-z0-9]+$/, "Short code must be alphanumeric"),
 });
+
+export const apiKeyBodySchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(64, "Name cannot exceed 64 characters"),
+});
+
+export const apiKeyIdParamSchema = z.object({
+  id: z.string().uuid({ message: "Must be a valid uuid" }),
+});

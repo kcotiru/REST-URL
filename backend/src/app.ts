@@ -7,8 +7,12 @@ import { UrlRepository } from "./repositories/url.repository";
 import { UrlService } from "./services/url.service";
 import { UrlController } from "./controllers/url.controller";
 import { createUrlRouter } from "./routes/url.routes";
+import { ApiKeyRepository } from "./repositories/apiKey.repository";
+import { ApiKeyService } from "./services/apiKey.service";
+import { ApiKeyController } from "./controllers/apiKey.controller";
+import { createApiKeyRouter } from "./routes/apiKey.routes";
 import { errorHandler } from "./middleware/errorHandler";
-import { requireAuth } from "./middleware/auth";
+import { createRequireAuth } from "./middleware/auth";
 import { validate, shortCodeParamSchema } from "./middleware/validate";
 
 const createApp = (): Application => {
@@ -24,12 +28,17 @@ const createApp = (): Application => {
   const urlRepository = new UrlRepository(pool);
   const urlService = new UrlService(urlRepository);
   const urlController = new UrlController(urlService);
+  const apiKeyRepository = new ApiKeyRepository(pool);
+  const apiKeyService = new ApiKeyService(apiKeyRepository);
+  const apiKeyController = new ApiKeyController(apiKeyService);
+  const requireAuth = createRequireAuth(apiKeyRepository);
 
   // ── Routes ─────────────────────────────────────────────────────────────────
   app.get("/health", (_req: Request, res: Response) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
   app.use("/api/v1/links", requireAuth, createUrlRouter(urlController));
+  app.use("/api/v1/keys", requireAuth, createApiKeyRouter(apiKeyController));
   app.get("/:code", validate(shortCodeParamSchema, "params"), urlController.redirect);
   
   app.use(errorHandler);
