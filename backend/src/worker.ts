@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 dotenv.config();
 
+import { once } from "node:events";
 import type { Pool } from "pg";
 import type Redis from "ioredis";
 import pool from "./config/database";
@@ -76,6 +77,9 @@ const run = async (): Promise<void> => {
   };
   process.on("SIGTERM", () => stop("SIGTERM"));
   process.on("SIGINT", () => stop("SIGINT"));
+
+  // enableOfflineQueue is off, so commands sent before the connection is up are rejected.
+  if (redis.status !== "ready") await once(redis, "ready");
 
   let lastPurge = 0;
   console.log("Click worker started");
