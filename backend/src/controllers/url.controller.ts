@@ -14,6 +14,14 @@ export class UrlController {
     }
   };
 
+  list = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      ApiResponse.success(res, await this.urlService.list(req.user!.id));
+    } catch (err) {
+      next(err);
+    }
+  };
+
   getByShortCode = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const result = await this.urlService.getByShortCode(req.user!.id, req.params.code);

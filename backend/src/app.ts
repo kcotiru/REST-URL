@@ -6,7 +6,7 @@ import compression from "compression";
 import pool from "./config/database";
 import redis from "./config/redis";
 import stripe from "./config/stripe";
-import { FRONTEND_ORIGIN, PLANS } from "./config/plans";
+import { FRONTEND_ORIGIN, PLANS, PLAN_PRICE_USD_MONTHLY } from "./config/plans";
 import { UrlRepository } from "./repositories/url.repository";
 import { ClickRepository } from "./repositories/click.repository";
 import { SubscriptionRepository } from "./repositories/subscription.repository";
@@ -73,6 +73,17 @@ const createApp = (): Application => {
   // BEFORE express.json(): the signature is over the exact raw bytes, which json parsing would destroy.
   app.post("/api/v1/billing/webhook", express.raw({ type: "application/json" }), billingController.webhook);
   app.use(express.json());
+
+  // Public (before the auth mount) so the pricing page works signed out; limited per IP like redirects.
+  app.get("/api/v1/plans", redirectRateLimit, (_req: Request, res: Response) => {
+    res.json({
+      status: "success",
+      data: {
+        free: { ...PLANS.free, priceUsdMonthly: PLAN_PRICE_USD_MONTHLY.free },
+        pro: { ...PLANS.pro, priceUsdMonthly: PLAN_PRICE_USD_MONTHLY.pro },
+      },
+    });
+  });
 
   app.use("/api/v1", requireAuth, apiRateLimit);
   app.use("/api/v1/links", createUrlRouter(urlController));

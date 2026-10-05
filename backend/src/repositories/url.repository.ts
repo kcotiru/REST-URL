@@ -21,6 +21,15 @@ export class UrlRepository {
     return rows[0] ?? null;
   }
 
+  // Newest first. ponytail: capped at 100, upgrade to cursor pagination ("createdAt","id") past that.
+  async listOwned(ownerId: string): Promise<UrlEntity[]> {
+    const { rows } = await this.db.query<UrlEntity>(
+      `SELECT * FROM urls WHERE "ownerId" = $1 ORDER BY "createdAt" DESC, id DESC LIMIT 100`,
+      [ownerId],
+    );
+    return rows;
+  }
+
   // Public, unscoped: used by the redirect only.
   async findByShortCode(shortCode: string): Promise<UrlEntity | null> {
     const { rows } = await this.db.query<UrlEntity>(

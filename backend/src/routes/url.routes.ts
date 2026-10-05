@@ -8,6 +8,7 @@ export const createUrlRouter = (controller: UrlController): Router => {
   const codeParam = validate(shortCodeParamSchema, "params");
 
   router.post("/", validate(urlBodySchema), controller.createShortUrl);
+  router.get("/", controller.list);
   router.get("/:code", codeParam, controller.getByShortCode);
   router.put("/:code", codeParam, validate(urlBodySchema), controller.updateShortUrl);
   router.delete("/:code", codeParam, controller.deleteShortUrl);

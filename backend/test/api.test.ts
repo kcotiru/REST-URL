@@ -119,6 +119,12 @@ it("refuses to start with a live or missing Stripe key", async () => {
   expect(assertTestKey("rk_test_x")).toBe("rk_test_x");
 });
 
+it("GET /api/v1/plans is public and returns both plans with the display price", async () => {
+  const res = await request(app).get("/api/v1/plans").expect(200);
+  expect(res.body.data.free).toEqual({ linksPerMonth: 50, apiRequestsPerMinute: 60, analyticsDays: 30, priceUsdMonthly: 0 });
+  expect(res.body.data.pro).toMatchObject({ linksPerMonth: 5000, priceUsdMonthly: 9 });
+});
+
 describe("validation", () => {
   it("rejects reserved custom codes (case-insensitive) and non-http(s) URLs", async () => {
     const h = { Authorization: `Bearer ${await sign(randomUUID())}` };
@@ -203,6 +209,25 @@ describe.skipIf(!TEST_DB)("with database", () => {
     const row = await pool.query(`SELECT "url" FROM urls WHERE "shortCode" = $1`, [code]);
     expect(row.rows).toHaveLength(1);
     expect(row.rows[0].url).toBe("https://example.com/a");
+  });
+
+  it("GET /links lists only the caller's links, newest first, with accessCount", async () => {
+    const h = await auth(A);
+    for (const n of ["one", "two", "three"]) {
+      await request(app).post("/api/v1/links").set(h).send({ url: `https://example.com/${n}` }).expect(201);
+    }
+    await request(app).post("/api/v1/links").set(await auth(B)).send({ url: "https://example.com/b-only" }).expect(201);
+    await pool.query(`UPDATE urls SET "accessCount" = 7 WHERE "url" = 'https://example.com/one'`);
+
+    const res = await request(app).get("/api/v1/links").set(h).expect(200);
+    expect(res.body.data.map((l: { url: string }) => l.url)).toEqual([
+      "https://example.com/three", "https://example.com/two", "https://example.com/one",
+    ]);
+    expect(res.body.data[2].accessCount).toBe(7);
+    expect(res.body.data[0]).not.toHaveProperty("ownerId");
+    // The /:code route still resolves next to the list route.
+    await request(app).get(`/api/v1/links/${res.body.data[0].shortCode}`).set(h).expect(200);
+    await request(app).get("/api/v1/links").expect(401);
   });
 
   it("legacy rows with NULL ownerId are read-only: 404 for everyone, redirect works", async () => {

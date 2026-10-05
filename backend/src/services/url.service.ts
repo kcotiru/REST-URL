@@ -104,6 +104,10 @@ export class UrlService {
     return toResponseDTO(entity);
   }
 
+  async list(ownerId: string): Promise<UrlStatsDTO[]> {
+    return (await this.urlRepository.listOwned(ownerId)).map(toStatsDTO);
+  }
+
   async getByShortCode(ownerId: string, shortCode: string): Promise<UrlResponseDTO> {
     const entity = await this.urlRepository.findOwned(shortCode, ownerId);
     if (!entity) 
