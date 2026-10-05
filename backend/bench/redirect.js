@@ -71,7 +71,8 @@ const scenarios = {
       console.log(
         JSON.stringify({
           scenario: name, round, connections: CONNECTIONS, seconds: SECONDS,
-          requests: r.requests.total, reqPerSec: Math.round(r.requests.total / r.duration),
+          requests: r.requests.total, durationSec: r.duration,
+          reqPerSec: Math.round(r.requests.total / r.duration), autocannonReqPerSecAvg: r.requests.average,
           // Exact percentiles from per-response timings (autocannon's own histogram has 1 ms buckets and no p95).
           latencyMs: { p50: pct(sorted, 50), p95: pct(sorted, 95), p99: pct(sorted, 99), max: sorted[sorted.length - 1] },
           autocannonLatencyMs: { p50: r.latency.p50, p97_5: r.latency.p97_5, p99: r.latency.p99 },
