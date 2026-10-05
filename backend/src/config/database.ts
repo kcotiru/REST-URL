@@ -25,7 +25,7 @@ pool.on("error", (err) => {
 
 export const connectDB = async (): Promise<void> => {
   const client = await pool.connect();
-  console.log("✅ PostgreSQL connected");
+  console.log("PostgreSQL connected");
   client.release();
 };
 
