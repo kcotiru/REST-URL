@@ -6,9 +6,14 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import request from "supertest";
 import { SignJWT, exportJWK, generateKeyPair, KeyLike } from "jose";
 import type { Pool } from "pg";
+import express from "express";
 import type { Application } from "express";
+import type Redis from "ioredis";
+import { rateLimit } from "../src/middleware/rateLimit";
+import { errorHandler } from "../src/middleware/errorHandler";
 
 const TEST_DB = process.env.TEST_DATABASE_URL;
+const TEST_REDIS = process.env.TEST_REDIS_URL;
 const migration = (f: string) => readFileSync(path.join(__dirname, "../db/migrations", f), "utf8");
 
 let jwksServer: Server;
@@ -16,6 +21,9 @@ let origin: string;
 let privateKey: KeyLike;
 let app: Application;
 let pool: Pool;
+let redis: Redis;
+
+const ready = (c: Redis) => (c.status === "ready" ? undefined : new Promise((r) => c.once("ready", r)));
 
 const sign = (sub: string, opts: { key?: KeyLike; aud?: string } = {}) =>
   new SignJWT({})
@@ -41,8 +49,13 @@ beforeAll(async () => {
   // Never the live DB: a placeholder keeps the pool lazy when no test DB is configured.
   process.env.DATABASE_URL = TEST_DB || "postgresql://unused:unused@127.0.0.1:1/unused";
 
+  // Never the dev Redis: a dead port makes the app fail open when no test Redis is configured.
+  process.env.REDIS_URL = TEST_REDIS || "redis://127.0.0.1:1";
+
   app = (await import("../src/app")).default();
   pool = (await import("../src/config/database")).default;
+  redis = (await import("../src/config/redis")).default;
+  if (TEST_REDIS) await ready(redis);
 
   if (TEST_DB) {
     await pool.query("CREATE SCHEMA IF NOT EXISTS auth; CREATE TABLE IF NOT EXISTS auth.users (id uuid PRIMARY KEY);");
@@ -52,8 +65,13 @@ beforeAll(async () => {
   }
 });
 
+beforeEach(async () => {
+  if (TEST_REDIS) await redis.flushdb();
+});
+
 afterAll(async () => {
   jwksServer.close();
+  redis.disconnect();
   if (TEST_DB) await pool.end();
 });
 
@@ -85,6 +103,50 @@ describe("validation", () => {
     const h = { Authorization: `Bearer ${await sign(randomUUID())}` };
     await request(app).post("/api/v1/links").set(h).send({ url: "https://example.com", customCode: "Dashboard" }).expect(400);
     await request(app).post("/api/v1/links").set(h).send({ url: "javascript:alert(1)" }).expect(400);
+  });
+});
+
+describe("rate limiter", () => {
+  let t = 10 * 60_000 + 1_000;
+  const miniApp = (client: Redis) => {
+    const a = express();
+    a.use(rateLimit({ redis: client, windowMs: 60_000, limit: () => 5, key: () => "unit", now: () => t }));
+    a.get("/", (_req, res) => void res.send("ok"));
+    a.use(errorHandler);
+    return a;
+  };
+
+  it.skipIf(!TEST_REDIS)("allows N requests with a falling Remaining, then 429 with Retry-After, then recovers", async () => {
+    const client = (await import("../src/config/redis")).createRedis(TEST_REDIS!);
+    await ready(client);
+    try {
+      const a = miniApp(client);
+      for (let i = 0; i < 5; i++) {
+        const res = await request(a).get("/").expect(200);
+        expect(res.headers["ratelimit-limit"]).toBe("5");
+        expect(res.headers["ratelimit-remaining"]).toBe(String(4 - i));
+        expect(Number(res.headers["ratelimit-reset"])).toBeGreaterThanOrEqual(1);
+      }
+      const blocked = await request(a).get("/").expect(429);
+      expect(blocked.headers["retry-after"]).toMatch(/^[1-9]\d*$/);
+      expect(blocked.headers["ratelimit-remaining"]).toBe("0");
+      expect(blocked.body.status).toBe("error");
+
+      t += 2 * 60_000; // two full windows later nothing is carried over
+      await request(a).get("/").expect(200);
+    } finally {
+      client.disconnect();
+    }
+  });
+
+  it("fails open when Redis is unreachable", async () => {
+    const client = (await import("../src/config/redis")).createRedis("redis://127.0.0.1:6390");
+    try {
+      const a = miniApp(client);
+      for (let i = 0; i < 7; i++) await request(a).get("/").expect(200);
+    } finally {
+      client.disconnect();
+    }
   });
 });
 
@@ -127,6 +189,30 @@ describe.skipIf(!TEST_DB)("with database", () => {
     await request(app).put("/api/v1/links/legacy1").set(await auth(A)).send({ url: "https://x.example" }).expect(404);
     await request(app).delete("/api/v1/links/legacy1").set(await auth(A)).expect(404);
     await request(app).get("/legacy1").expect(302).expect("Location", "https://legacy.example");
+  });
+
+  describe.skipIf(!TEST_REDIS)("redis", () => {
+    it("redirect cache is populated on first hit and invalidated on update and delete", async () => {
+      const h = await auth(A);
+      const { shortCode: code } = (await request(app).post("/api/v1/links").set(h).send({ url: "https://example.com/a" }).expect(201)).body.data;
+      expect(await redis.exists(`url:${code}`)).toBe(0);
+
+      await request(app).get(`/${code}`).expect(302).expect("Location", "https://example.com/a");
+      expect(await redis.get(`url:${code}`)).toBe("https://example.com/a");
+
+      await request(app).put(`/api/v1/links/${code}`).set(h).send({ url: "https://example.com/b" }).expect(200);
+      expect(await redis.exists(`url:${code}`)).toBe(0);
+      await request(app).get(`/${code}`).expect(302).expect("Location", "https://example.com/b");
+
+      await request(app).delete(`/api/v1/links/${code}`).set(h).expect(204);
+      await request(app).get(`/${code}`).expect(404);
+    });
+
+    it("API requests carry the free-plan rate limit headers", async () => {
+      const res = await request(app).post("/api/v1/links").set(await auth(A)).send({ url: "https://example.com/rl" }).expect(201);
+      expect(res.headers["ratelimit-limit"]).toBe("60");
+      expect(res.headers["ratelimit-remaining"]).toBe("59");
+    });
   });
 
   describe("api keys", () => {

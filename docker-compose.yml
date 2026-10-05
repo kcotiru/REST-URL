@@ -1,4 +1,4 @@
-# Local services for tests/dev. Phase 3 adds Redis here.
+# Local services for tests/dev.
 services:
   postgres:
     image: postgres:16
@@ -8,3 +8,7 @@ services:
       POSTGRES_DB: urlshortener_test
     ports:
       - "54329:5432"
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"

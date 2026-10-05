@@ -83,7 +83,7 @@ Run `psql "$DATABASE_URL" -f backend/db/migrations/002_url_owner.sql` after `001
 
 Run `psql "$DATABASE_URL" -f backend/db/migrations/003_api_keys.sql` next (adds the `api_keys` table; only SHA-256 hashes of keys are stored).
 
-Tests: `docker compose up -d`, then `TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:54329/urlshortener_test npm test` in `backend/` (DB tests skip without it).
+Tests: `docker compose up -d`, then `TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:54329/urlshortener_test TEST_REDIS_URL=redis://localhost:6379/15 npm test` in `backend/` (DB and Redis tests skip without them; the Redis DB is flushed, so use index 15).
 
 ---
 
@@ -103,6 +103,16 @@ Key management is JWT-session only: an API key calling `/api/v1/keys` gets `403`
 curl -H "Authorization: Bearer ru_live_…" -H "Content-Type: application/json" \
   -X POST http://localhost:3000/api/v1/links -d '{"url":"https://example.com"}'
 ```
+
+---
+
+## Redis: rate limiting and redirect cache
+
+`docker compose up -d` starts Redis on `localhost:6379`; point the backend at it with `REDIS_URL` (default `redis://localhost:6379`). Redis is optional at runtime: if it is down, requests are never blocked (rate limiting and caching are skipped, errors are logged).
+
+- **Rate limits** use a sliding-window counter. `/api/v1/*` is limited per API key (or per user for JWTs) by plan: 60 req/min on free. Public redirects are limited to 600/min per client IP; set `TRUST_PROXY` (number of proxy hops) when running behind a reverse proxy, otherwise all clients share one bucket.
+- Every limited response carries `RateLimit-Limit`, `RateLimit-Remaining` and `RateLimit-Reset` (seconds); a blocked one is `429` with `Retry-After`.
+- **Redirect cache**: `GET /:code` caches the target in `url:<code>` for 1 hour; updating or deleting a link evicts it. Redirects stay `302` so browsers don't cache them and clicks still reach us.
 
 ---
 

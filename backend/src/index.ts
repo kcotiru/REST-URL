@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import { connectDB } from "./config/database";
+import redis from "./config/redis";
 import createApp from "./app";
 
 const PORT = Number(process.env.PORT) || 3000;
@@ -19,7 +20,8 @@ const start = async (): Promise<void> => {
   // ── Graceful shutdown ──────────────────────────────────────────────────────
   const shutdown = (signal: string) => {
     console.log(`\n${signal} received — shutting down...`);
-    server.close(() => {
+    server.close(async () => {
+      await redis.quit().catch(() => redis.disconnect());
       console.log("HTTP server closed");
       process.exit(0);
     });
