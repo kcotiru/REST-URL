@@ -29,7 +29,7 @@ flowchart LR
 Needs Node 20+, Docker, a Supabase project (Auth + Postgres); for billing, the Stripe CLI.
 
 ```bash
-docker compose up -d     # Postgres 16 :54329 + Redis 7 :6379 (tests/bench only; the app uses Supabase)
+docker compose up -d     # Redis 7 :6379 (app + tests); Postgres 16 :54329 (tests/bench only)
 cp backend/.env.example backend/.env && cp frontend/.env.example frontend/.env   # then fill in
 for f in backend/db/migrations/*.sql; do psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"; done  # 001-006
 (cd backend && npm install && npm run dev)     # API :3000
