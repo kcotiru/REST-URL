@@ -2,6 +2,7 @@ import { customAlphabet } from "nanoid";
 import { UrlRepository } from "../repositories/url.repository";
 import { CreateUrlDTO, UpdateUrlDTO, UrlEntity, UrlResponseDTO, UrlStatsDTO } from "../types/url.types";
 import { NotFoundError, ValidationError } from "../utils/errors";
+import { RESERVED_CODES } from "../middleware/validate";
 
 const SHORT_CODE_LENGTH = Number(process.env.SHORT_CODE_LENGTH) || 7;
 const ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
@@ -23,7 +24,7 @@ const toStatsDTO = (entity: UrlEntity): UrlStatsDTO => ({
 export class UrlService {
   constructor(private urlRepository: UrlRepository) {}
 
-  async createShortUrl(dto: CreateUrlDTO): Promise<UrlResponseDTO> {
+  async createShortUrl(ownerId: string, dto: CreateUrlDTO): Promise<UrlResponseDTO> {
     if (dto.customCode) {
       const taken = await this.urlRepository.shortCodeExists(dto.customCode);
       if (taken) {
@@ -34,6 +35,7 @@ export class UrlService {
       const entity = await this.urlRepository.create({
         url: dto.url,
         shortCode: dto.customCode,
+        ownerId,
       });
       return toResponseDTO(entity);
     }
@@ -47,38 +49,40 @@ export class UrlService {
       if (attempts > 10) 
         throw new Error("Failed to generate unique short code");
     } while (
+        RESERVED_CODES.has(shortCode.toLowerCase()) ||
         await this.urlRepository.shortCodeExists(shortCode)
     );
 
-    const entity = await this.urlRepository.create({ url: dto.url, shortCode });
+    const entity = await this.urlRepository.create({ url: dto.url, shortCode, ownerId });
     return toResponseDTO(entity);
   }
 
-  async getByShortCode(shortCode: string): Promise<UrlResponseDTO> {
-    const entity = await this.urlRepository.findByShortCode(shortCode);
+  async getByShortCode(ownerId: string, shortCode: string): Promise<UrlResponseDTO> {
+    const entity = await this.urlRepository.findOwned(shortCode, ownerId);
     if (!entity) 
       throw new NotFoundError(`Short code "${shortCode}" not found`);
     return toResponseDTO(entity);
   }
 
   async updateShortUrl(
+    ownerId: string,
     shortCode: string,
     dto: UpdateUrlDTO,
   ): Promise<UrlResponseDTO> {
-    const entity = await this.urlRepository.update(shortCode, dto);
+    const entity = await this.urlRepository.update(shortCode, ownerId, dto);
     if (!entity) 
       throw new NotFoundError(`Short code "${shortCode}" not found`);
     return toResponseDTO(entity);
   }
 
-  async deleteShortUrl(shortCode: string): Promise<void> {
-    const deleted = await this.urlRepository.delete(shortCode);
+  async deleteShortUrl(ownerId: string, shortCode: string): Promise<void> {
+    const deleted = await this.urlRepository.delete(shortCode, ownerId);
     if (!deleted) 
       throw new NotFoundError(`Short code "${shortCode}" not found`);
   }
 
-  async getStats(shortCode: string): Promise<UrlStatsDTO> {
-    const entity = await this.urlRepository.findByShortCode(shortCode);
+  async getStats(ownerId: string, shortCode: string): Promise<UrlStatsDTO> {
+    const entity = await this.urlRepository.findOwned(shortCode, ownerId);
     if (!entity) 
       throw new NotFoundError(`Short code "${shortCode}" not found`);
     return toStatsDTO(entity);

@@ -21,3 +21,9 @@ export class ValidationError extends AppError {
     super(message, 400, errors);
   }
 }
+
+export class UnauthorizedError extends AppError {
+  constructor(message = "Authentication required") {
+    super(message, 401);
+  }
+}

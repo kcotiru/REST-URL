@@ -8,6 +8,7 @@ import { UrlService } from "./services/url.service";
 import { UrlController } from "./controllers/url.controller";
 import { createUrlRouter } from "./routes/url.routes";
 import { errorHandler } from "./middleware/errorHandler";
+import { requireAuth } from "./middleware/auth";
 import { validate, shortCodeParamSchema } from "./middleware/validate";
 
 const createApp = (): Application => {
@@ -15,7 +16,7 @@ const createApp = (): Application => {
 
   // ── Global middleware ──────────────────────────────────────────────────────
   app.use(helmet());
-  app.use(cors());
+  app.use(cors({ origin: process.env.FRONTEND_ORIGIN || "http://localhost:5173" }));
   app.use(compression());
   app.use(express.json());
 
@@ -28,7 +29,7 @@ const createApp = (): Application => {
   app.get("/health", (_req: Request, res: Response) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
-  app.use("/api/v1/links", createUrlRouter(urlController));
+  app.use("/api/v1/links", requireAuth, createUrlRouter(urlController));
   app.get("/:code", validate(shortCodeParamSchema, "params"), urlController.redirect);
   
   app.use(errorHandler);

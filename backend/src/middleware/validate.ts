@@ -14,14 +14,25 @@ export const validate =
     next();
   };
 
+// Paths the frontend or API own at the root; they must never be shortcodes.
+export const RESERVED_CODES = new Set([
+  "api", "health", "login", "logout", "signup", "register", "dashboard", "pricing", "billing",
+  "keys", "links", "shorten", "stats", "settings", "account", "admin", "auth", "static",
+  "assets", "favicon", "docs",
+]);
+
 // ── Shared Zod schemas ────────────────────────────────────────────────────────
 export const urlBodySchema = z.object({
-  url: z.string().url({ message: "Must be a valid URL" }),
+  url: z
+    .string()
+    .url({ message: "Must be a valid URL" })
+    .refine((u) => ["http:", "https:"].includes(new URL(u).protocol), "URL must use http or https"),
   customCode: z
     .string()
     .min(3, "Custom code must be at least 3 characters")
     .max(10, "Custom code cannot exceed 10 characters")
     .regex(/^[A-Za-z0-9]+$/, "Custom code must be alphanumeric only")
+    .refine((c) => !RESERVED_CODES.has(c.toLowerCase()), "That custom code is reserved")
     .optional(),
 });
 

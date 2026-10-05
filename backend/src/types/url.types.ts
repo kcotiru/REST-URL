@@ -6,6 +6,7 @@ export interface UrlEntity {
   createdAt: Date;
   updatedAt: Date;
   accessCount: number;
+  ownerId: string | null;
 }
 
 // ── Request / Response DTOs ────────────────────────────────

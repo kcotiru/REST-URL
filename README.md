@@ -77,9 +77,11 @@ Each sub-project has its own detailed README:
 
 ---
 
-## Known Limitations
+## Migrations
 
-- **No link ownership or auth** — any client can currently `PUT` or `DELETE` any short code. This is addressed in Phase 1.
+Run `psql "$DATABASE_URL" -f backend/db/migrations/002_url_owner.sql` after `001_init.sql` (adds `urls."ownerId"`; existing links become read-only legacy rows).
+
+Tests: `docker compose up -d`, then `TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:54329/urlshortener_test npm test` in `backend/` (DB tests skip without it).
 
 ---
 

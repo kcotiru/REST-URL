@@ -7,7 +7,7 @@ export class UrlController {
 
   createShortUrl = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const result = await this.urlService.createShortUrl(req.body);
+      const result = await this.urlService.createShortUrl(req.user!.id, req.body);
       ApiResponse.success(res, result, 201);
     } catch (err) {
       next(err);
@@ -16,7 +16,7 @@ export class UrlController {
 
   getByShortCode = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const result = await this.urlService.getByShortCode(req.params.code);
+      const result = await this.urlService.getByShortCode(req.user!.id, req.params.code);
       ApiResponse.success(res, result);
     } catch (err) {
       next(err);
@@ -26,6 +26,7 @@ export class UrlController {
   updateShortUrl = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const result = await this.urlService.updateShortUrl(
+        req.user!.id,
         req.params.code,
         req.body,
       );
@@ -37,7 +38,7 @@ export class UrlController {
 
   deleteShortUrl = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      await this.urlService.deleteShortUrl(req.params.code);
+      await this.urlService.deleteShortUrl(req.user!.id, req.params.code);
       res.status(204).send();
     } catch (err) {
       next(err);
@@ -46,7 +47,7 @@ export class UrlController {
 
   getStats = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const result = await this.urlService.getStats(req.params.code);
+      const result = await this.urlService.getStats(req.user!.id, req.params.code);
       ApiResponse.success(res, result);
     } catch (err) {
       next(err);
