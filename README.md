@@ -46,14 +46,14 @@ The frontend proxies all `/api/*` calls to the backend during development. The b
 
 Each sub-project has its own detailed README:
 
-- [`url-shortener/README.md`](./url-shortener/README.md) — backend architecture, environment variables, layered design decisions
+- [`backend/README.md`](./backend/README.md) — backend architecture, environment variables, layered design decisions
 - [`frontend/README.md`](./frontend/README.md) — pages, design system, API client usage, build instructions
 
 ---
 
 ## Tech Stack
 
-### Backend (`url-shortener/`)
+### Backend (`backend/`)
 | | |
 |---|---|
 | Runtime | Node.js 18+ |
@@ -74,6 +74,12 @@ Each sub-project has its own detailed README:
 | Routing | React Router 6 |
 | Icons | Lucide React |
 | Fonts | Syne · DM Sans · Space Mono |
+
+---
+
+## Known Limitations
+
+- **No link ownership or auth** — any client can currently `PUT` or `DELETE` any short code. This is addressed in Phase 1.
 
 ---
 

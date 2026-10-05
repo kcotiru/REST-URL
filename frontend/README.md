@@ -74,7 +74,7 @@ Analytics lookup page. Features:
 
 ### Prerequisites
 - Node.js 18+
-- The [url-shortener backend](../url-shortener/README.md) running on `http://localhost:3000`
+- The [backend](../backend/README.md) running on `http://localhost:3000`
 
 ### Install & run
 
