@@ -39,3 +39,15 @@ export class ForbiddenError extends AppError {
     super(message, 403);
   }
 }
+
+export class ConflictError extends AppError {
+  constructor(message = "Conflict") {
+    super(message, 409);
+  }
+}
+
+export class QuotaExceededError extends AppError {
+  constructor(message: string, upgradeUrl: string) {
+    super(message, 402, { upgradeUrl });
+  }
+}

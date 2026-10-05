@@ -53,7 +53,7 @@ export const createRequireAuth =
         audience: "authenticated",
       });
       if (!payload.sub) throw new Error("missing sub");
-      req.user = { id: payload.sub };
+      req.user = { id: payload.sub, email: typeof payload.email === "string" ? payload.email : undefined };
       next();
     } catch {
       next(new UnauthorizedError("Invalid or expired token"));
