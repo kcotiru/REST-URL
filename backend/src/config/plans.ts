@@ -5,8 +5,11 @@ export const PLANS = {
 
 export type PlanId = keyof typeof PLANS;
 
-// ponytail: everyone is free for now, Phase 5 reads the user's row from `subscriptions`.
-export const getUserPlan = async (_userId: string): Promise<PlanId> => "free";
+// past_due keeps Pro while Stripe retries the payment; the user is downgraded when the
+// subscription becomes canceled/unpaid (customer.subscription.deleted).
+export const PRO_STATUSES = ["active", "trialing", "past_due"];
 
 // Raw clicks are purged after this many days (worker); only the daily rollup outlives it.
 export const RAW_CLICK_DAYS = 30;
+
+export const FRONTEND_ORIGIN = process.env.FRONTEND_ORIGIN || "http://localhost:5173";

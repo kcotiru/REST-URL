@@ -83,6 +83,8 @@ Run `psql "$DATABASE_URL" -f backend/db/migrations/002_url_owner.sql` after `001
 
 Run `psql "$DATABASE_URL" -f backend/db/migrations/003_api_keys.sql` next (adds the `api_keys` table; only SHA-256 hashes of keys are stored).
 
+Run `psql "$DATABASE_URL" -f backend/db/migrations/005_billing.sql` for billing (adds `subscriptions` and `stripe_events`).
+
 Tests: `docker compose up -d`, then `TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:54329/urlshortener_test TEST_REDIS_URL=redis://localhost:6379/15 npm test` in `backend/` (DB and Redis tests skip without them; the Redis DB is flushed, so use index 15).
 
 ---
@@ -103,6 +105,33 @@ Key management is JWT-session only: an API key calling `/api/v1/keys` gets `403`
 curl -H "Authorization: Bearer ru_live_…" -H "Content-Type: application/json" \
   -X POST http://localhost:3000/api/v1/links -d '{"url":"https://example.com"}'
 ```
+
+---
+
+## Billing (Stripe, test mode only)
+
+Plans live in code (`config/plans.ts`): free = 50 links/month, 60 req/min; pro = 5000 links/month, 600 req/min. The server refuses to start unless `STRIPE_SECRET_KEY` is an `sk_test_`/`rk_test_` key; `STRIPE_WEBHOOK_SECRET` and `STRIPE_PRICE_PRO` are required too.
+
+```bash
+stripe login
+stripe products create --name "REST-URL Pro"
+stripe prices create --product <prod_id> --unit-amount 900 --currency usd -d "recurring[interval]=month"
+# put the price id in STRIPE_PRICE_PRO
+stripe listen --forward-to localhost:3000/api/v1/billing/webhook
+# copy the whsec_... it prints into STRIPE_WEBHOOK_SECRET, restart the backend, then
+stripe trigger checkout.session.completed
+```
+
+| Method | Path | Notes |
+|---|---|---|
+| `GET` | `/api/v1/billing` | `{ plan, status, currentPeriodEnd, usage: { linksThisMonth, linksPerMonth } }` |
+| `POST` | `/api/v1/billing/checkout` | `{ url }` of a Stripe Checkout page; `409` if already Pro |
+| `POST` | `/api/v1/billing/portal` | `{ url }` of the billing portal; `404` before the first checkout |
+| `POST` | `/api/v1/billing/webhook` | Stripe only: unauthenticated, signature-verified, not rate-limited |
+
+Billing endpoints are JWT-session only (`403` for API keys). **The webhook is the only source of truth for plan state**: the checkout success redirect changes nothing. Each handled event re-fetches the subscription and stores its current state, and its id is recorded in the same transaction, so redeliveries are no-ops and failures roll back for Stripe to retry. `past_due` keeps Pro during Stripe's payment retries; the user is downgraded when the subscription is canceled/unpaid. Creating a link over the monthly quota returns `402` with `errors.upgradeUrl`.
+
+Future work: metered overage billing instead of a hard quota.
 
 ---
 

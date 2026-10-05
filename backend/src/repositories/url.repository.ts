@@ -48,6 +48,16 @@ export class UrlRepository {
     return (rowCount ?? 0) > 0;
   }
 
+  // Links created since the start of the current UTC month (quota usage).
+  async countThisMonth(ownerId: string): Promise<number> {
+    const { rows } = await this.db.query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM urls
+       WHERE "ownerId" = $1 AND "createdAt" >= date_trunc('month', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`,
+      [ownerId],
+    );
+    return rows[0].n;
+  }
+
   async shortCodeExists(shortCode: string): Promise<boolean> {
     const { rows } = await this.db.query<{ exists: boolean }>(
       `SELECT EXISTS(SELECT 1 FROM urls WHERE "shortCode" = $1) AS exists`,

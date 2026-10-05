@@ -7,9 +7,10 @@ import { ClickRepository } from "../repositories/click.repository";
 import {
   AnalyticsDTO, ClickContext, CreateUrlDTO, UpdateUrlDTO, UrlEntity, UrlResponseDTO, UrlStatsDTO,
 } from "../types/url.types";
-import { NotFoundError, ValidationError } from "../utils/errors";
+import { BillingService } from "./billing.service";
+import { NotFoundError, QuotaExceededError, ValidationError } from "../utils/errors";
 import { RESERVED_CODES } from "../middleware/validate";
-import { getUserPlan, PLANS, RAW_CLICK_DAYS } from "../config/plans";
+import { FRONTEND_ORIGIN, PLANS, RAW_CLICK_DAYS } from "../config/plans";
 import { addDays, isoDay } from "../utils/date";
 
 const SHORT_CODE_LENGTH = Number(process.env.SHORT_CODE_LENGTH) || 7;
@@ -56,9 +57,21 @@ export class UrlService {
     private urlRepository: UrlRepository,
     private redis: Redis,
     private clickRepository: ClickRepository,
+    private billing: BillingService,
   ) {}
 
   async createShortUrl(ownerId: string, dto: CreateUrlDTO): Promise<UrlResponseDTO> {
+    // ponytail: deleting a link refunds quota, and concurrent creates can overshoot by a few;
+    // upgrade to a per-month usage counter row updated atomically.
+    const plan = await this.billing.getPlan(ownerId);
+    const limit = PLANS[plan].linksPerMonth;
+    if ((await this.urlRepository.countThisMonth(ownerId)) >= limit) {
+      throw new QuotaExceededError(
+        `Monthly link limit reached (${limit} on the ${plan === "pro" ? "Pro" : "Free"} plan). Upgrade at ${FRONTEND_ORIGIN}/pricing`,
+        `${FRONTEND_ORIGIN}/pricing`,
+      );
+    }
+
     if (dto.customCode) {
       const taken = await this.urlRepository.shortCodeExists(dto.customCode);
       if (taken) {
@@ -175,7 +188,7 @@ export class UrlService {
 
     // The plan caps how far back a range may start; the clamped range is what the response reports.
     const today = isoDay();
-    const floor = addDays(today, -PLANS[await getUserPlan(ownerId)].analyticsDays);
+    const floor = addDays(today, -PLANS[await this.billing.getPlan(ownerId)].analyticsDays);
     const from = range.from < floor ? floor : range.from;
     const days = (Date.parse(range.to) - Date.parse(from)) / 86_400_000 + 1;
     // Hourly detail needs raw rows: short range that still lies inside raw retention, else the rollup.

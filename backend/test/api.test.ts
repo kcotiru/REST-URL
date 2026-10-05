@@ -2,16 +2,18 @@ import { readFileSync } from "node:fs";
 import { createServer, Server } from "node:http";
 import { createHash, randomUUID } from "node:crypto";
 import path from "node:path";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import request from "supertest";
 import { SignJWT, exportJWK, generateKeyPair, KeyLike } from "jose";
 import type { Pool } from "pg";
 import express from "express";
 import type { Application } from "express";
 import type Redis from "ioredis";
+import type Stripe from "stripe";
 import { rateLimit } from "../src/middleware/rateLimit";
 import { addDays } from "../src/utils/date";
 import { errorHandler } from "../src/middleware/errorHandler";
+import { SubscriptionRepository } from "../src/repositories/subscription.repository";
 
 const TEST_DB = process.env.TEST_DATABASE_URL;
 const TEST_REDIS = process.env.TEST_REDIS_URL;
@@ -23,11 +25,12 @@ let privateKey: KeyLike;
 let app: Application;
 let pool: Pool;
 let redis: Redis;
+let stripe: Stripe;
 
 const ready = (c: Redis) => (c.status === "ready" ? undefined : new Promise((r) => c.once("ready", r)));
 
-const sign = (sub: string, opts: { key?: KeyLike; aud?: string } = {}) =>
-  new SignJWT({})
+const sign = (sub: string, opts: { key?: KeyLike; aud?: string; email?: string } = {}) =>
+  new SignJWT(opts.email ? { email: opts.email } : {})
     .setProtectedHeader({ alg: "ES256", kid: "test-key" })
     .setSubject(sub)
     .setIssuer(`${origin}/auth/v1`)
@@ -53,7 +56,13 @@ beforeAll(async () => {
   // Never the dev Redis: a dead port makes the app fail open when no test Redis is configured.
   process.env.REDIS_URL = TEST_REDIS || "redis://127.0.0.1:1";
 
+  // Dummy test-mode values; every Stripe network call is mocked with vi.spyOn.
+  process.env.STRIPE_SECRET_KEY = "sk_test_dummy";
+  process.env.STRIPE_WEBHOOK_SECRET = "whsec_test_secret";
+  process.env.STRIPE_PRICE_PRO = "price_test_pro";
+
   app = (await import("../src/app")).default();
+  stripe = (await import("../src/config/stripe")).default;
   pool = (await import("../src/config/database")).default;
   redis = (await import("../src/config/redis")).default;
   if (TEST_REDIS) await ready(redis);
@@ -64,6 +73,7 @@ beforeAll(async () => {
     await pool.query(migration("002_url_owner.sql"));
     await pool.query(migration("003_api_keys.sql"));
     await pool.query(migration("004_clicks.sql"));
+    await pool.query(migration("005_billing.sql"));
   }
 });
 
@@ -98,6 +108,15 @@ describe("auth", () => {
     const token = await sign(randomUUID(), { aud: "anon" });
     await request(app).post("/api/v1/links").set("Authorization", `Bearer ${token}`).send(body).expect(401);
   });
+});
+
+it("refuses to start with a live or missing Stripe key", async () => {
+  const { assertTestKey } = await import("../src/config/stripe");
+  expect(() => assertTestKey("sk_live_x")).toThrow(/test-mode/);
+  expect(() => assertTestKey("rk_live_x")).toThrow(/test-mode/);
+  expect(() => assertTestKey(undefined)).toThrow(/test-mode/);
+  expect(assertTestKey("sk_test_x")).toBe("sk_test_x");
+  expect(assertTestKey("rk_test_x")).toBe("rk_test_x");
 });
 
 describe("validation", () => {
@@ -158,7 +177,7 @@ describe.skipIf(!TEST_DB)("with database", () => {
   const auth = async (id: string) => ({ Authorization: `Bearer ${await sign(id)}` });
 
   beforeEach(async () => {
-    await pool.query("TRUNCATE urls, api_keys, clicks, clicks_daily");
+    await pool.query("TRUNCATE urls, api_keys, clicks, clicks_daily, subscriptions, stripe_events");
     await pool.query("INSERT INTO auth.users (id) VALUES ($1), ($2) ON CONFLICT DO NOTHING", [A, B]);
   });
 
@@ -456,6 +475,229 @@ describe.skipIf(!TEST_DB)("with database", () => {
       await use();
       await sleep(300); // fire-and-forget: give a wrong update time to land
       expect((await lastUsed(k.id))!.getTime()).toBe(first!.getTime());
+    });
+  });
+
+  describe("billing", () => {
+    const C = randomUUID(); // a Pro user, seeded by SQL
+    const proSub = (userId: string) =>
+      pool.query(`INSERT INTO subscriptions ("userId", "stripeCustomerId", "stripeSubscriptionId", plan, status) VALUES ($1, $2, 'sub_seed', 'pro', 'active')`, [userId, `cus_${userId}`]);
+    const subRow = async (userId: string) =>
+      (await pool.query(`SELECT plan, status, "stripeCustomerId", "currentPeriodEnd" FROM subscriptions WHERE "userId" = $1`, [userId])).rows[0];
+    const eventCount = async () => (await pool.query("SELECT count(*)::int AS n FROM stripe_events")).rows[0].n as number;
+    const fakeSub = (o: { status?: string; price?: string; userId?: string | null } = {}) => ({
+      id: "sub_1",
+      status: o.status ?? "active",
+      customer: "cus_1",
+      metadata: o.userId === null ? {} : { userId: o.userId ?? A },
+      items: { data: [{ price: { id: o.price ?? "price_test_pro" }, current_period_end: 1893456000 }] },
+    });
+    // Signed with the real Stripe helper, so the real signature verification runs.
+    const deliver = (id: string, type = "customer.subscription.updated", object: object = { id: "sub_1" }, secret = "whsec_test_secret") => {
+      const payload = JSON.stringify({ id, object: "event", type, data: { object } });
+      const signature = stripe.webhooks.generateTestHeaderString({ payload, secret });
+      return request(app).post("/api/v1/billing/webhook").set({ "Content-Type": "application/json", "Stripe-Signature": signature }).send(payload);
+    };
+    const retrieve = (sub: object) => vi.spyOn(stripe.subscriptions, "retrieve").mockResolvedValue(sub as never);
+
+    beforeEach(async () => {
+      await pool.query("TRUNCATE subscriptions, stripe_events");
+      await pool.query("INSERT INTO auth.users (id) VALUES ($1) ON CONFLICT DO NOTHING", [C]);
+    });
+    afterEach(() => vi.restoreAllMocks());
+
+    it("a redelivered event changes state only once", async () => {
+      const get = retrieve(fakeSub());
+      expect((await deliver("evt_1").expect(200)).body).toEqual({ received: true });
+      expect(await subRow(A)).toMatchObject({ plan: "pro", status: "active", stripeCustomerId: "cus_1" });
+      expect((await subRow(A)).currentPeriodEnd.toISOString()).toBe("2030-01-01T00:00:00.000Z");
+
+      get.mockResolvedValue(fakeSub({ status: "canceled" }) as never);
+      expect((await deliver("evt_1").expect(200)).body).toEqual({ received: true, duplicate: true });
+      expect(get).toHaveBeenCalledTimes(1); // the fast path skipped Stripe
+      expect(await subRow(A)).toMatchObject({ plan: "pro", status: "active" });
+      expect(await eventCount()).toBe(1);
+
+      // Two deliveries racing past the fast path: the transaction's ON CONFLICT must still stop the second.
+      vi.spyOn(SubscriptionRepository.prototype, "hasEvent").mockResolvedValueOnce(false);
+      expect((await deliver("evt_1").expect(200)).body).toEqual({ received: true, duplicate: true });
+      expect(await subRow(A)).toMatchObject({ plan: "pro", status: "active" });
+      expect(await eventCount()).toBe(1);
+    });
+
+    it("rejects a bad or missing signature with 400 and records nothing", async () => {
+      const get = retrieve(fakeSub());
+      await deliver("evt_bad", "customer.subscription.updated", { id: "sub_1" }, "whsec_wrong").expect(400);
+      await request(app).post("/api/v1/billing/webhook").set("Content-Type", "application/json").send("{}").expect(400);
+      expect(get).not.toHaveBeenCalled();
+      expect(await eventCount()).toBe(0);
+      expect(await subRow(A)).toBeUndefined();
+    });
+
+    it("rolls back on a DB failure (500, event not recorded) and a redelivery applies", async () => {
+      const ghost = randomUUID(); // not in auth.users: the subscriptions FK fails inside the transaction
+      retrieve(fakeSub({ userId: ghost }));
+      vi.spyOn(console, "error").mockImplementation(() => undefined);
+      await deliver("evt_rb").expect(500);
+      expect(await eventCount()).toBe(0);
+      expect((await pool.query("SELECT count(*)::int AS n FROM subscriptions")).rows[0].n).toBe(0);
+
+      await pool.query("INSERT INTO auth.users (id) VALUES ($1)", [ghost]);
+      expect((await deliver("evt_rb").expect(200)).body).toEqual({ received: true });
+      expect(await subRow(ghost)).toMatchObject({ plan: "pro", status: "active" });
+      expect(await eventCount()).toBe(1);
+    });
+
+    it("syncs current Stripe state, not the event: an old 'deleted' for a live subscription downgrades nothing", async () => {
+      const get = retrieve(fakeSub());
+      await deliver("evt_a", "customer.subscription.updated").expect(200);
+      await deliver("evt_old", "customer.subscription.deleted").expect(200); // arrives late, subscription is still active
+      expect(await subRow(A)).toMatchObject({ plan: "pro", status: "active" });
+
+      get.mockResolvedValue(fakeSub({ status: "past_due" }) as never);
+      await deliver("evt_pf", "invoice.payment_failed", { parent: { subscription_details: { subscription: "sub_1" } } }).expect(200);
+      expect(await subRow(A)).toMatchObject({ plan: "pro", status: "past_due" }); // keeps Pro during retries
+
+      get.mockResolvedValue(fakeSub({ price: "price_other" }) as never);
+      await deliver("evt_price", "customer.subscription.updated").expect(200);
+      expect(await subRow(A)).toMatchObject({ plan: "free", status: "active" }); // wrong price is not Pro
+
+      get.mockResolvedValue(fakeSub({ userId: null }) as never); // no metadata: resolved by stripeCustomerId
+      await deliver("evt_cus", "customer.subscription.updated").expect(200);
+      expect(await subRow(A)).toMatchObject({ plan: "pro" });
+    });
+
+    it("checkout.session.completed uses client_reference_id; ignored events are 200 and not recorded", async () => {
+      const get = retrieve(fakeSub({ userId: null }));
+      await deliver("evt_co", "checkout.session.completed", { subscription: "sub_1", client_reference_id: B }).expect(200);
+      expect(await subRow(B)).toMatchObject({ plan: "pro" });
+      expect(get).toHaveBeenCalledWith("sub_1");
+
+      await deliver("evt_ign", "charge.succeeded", { id: "ch_1" }).expect(200);
+      await deliver("evt_pay", "checkout.session.completed", { subscription: null, client_reference_id: B }).expect(200);
+      expect(await eventCount()).toBe(1);
+    });
+
+    it("the webhook needs no Authorization header and is not rate limited", async () => {
+      retrieve(fakeSub());
+      const res = await deliver("evt_open").expect(200);
+      expect(res.headers).not.toHaveProperty("ratelimit-limit");
+      await request(app).post("/api/v1/billing/checkout").expect(401); // the rest of /billing is protected
+    });
+
+    it.skipIf(!TEST_REDIS)("a downgrade shows up on the very next request (plan cache invalidated)", async () => {
+      await proSub(A);
+      const h = await auth(A);
+      expect((await request(app).get("/api/v1/billing").set(h).expect(200)).headers["ratelimit-limit"]).toBe("600");
+      expect(await redis.get(`plan:${A}`)).toBe("pro");
+
+      retrieve(fakeSub({ status: "canceled" }));
+      await deliver("evt_del", "customer.subscription.deleted").expect(200);
+      expect(await subRow(A)).toMatchObject({ plan: "free", status: "canceled" });
+      expect(await redis.exists(`plan:${A}`)).toBe(0);
+      expect((await request(app).get("/api/v1/billing").set(h).expect(200)).headers["ratelimit-limit"]).toBe("60");
+    });
+
+    it("GET /billing reports plan, status, period end and usage", async () => {
+      const free = await request(app).get("/api/v1/billing").set(await auth(A)).expect(200);
+      expect(free.body.data).toEqual({ plan: "free", status: "none", currentPeriodEnd: null, usage: { linksThisMonth: 0, linksPerMonth: 50 } });
+      await request(app).post("/api/v1/links").set(await auth(A)).send({ url: "https://example.com/u" }).expect(201);
+      await proSub(C);
+      const pro = await request(app).get("/api/v1/billing").set(await auth(C)).expect(200);
+      expect(pro.body.data).toMatchObject({ plan: "pro", status: "active", usage: { linksThisMonth: 0, linksPerMonth: 5000 } });
+      expect((await request(app).get("/api/v1/billing").set(await auth(A)).expect(200)).body.data.usage.linksThisMonth).toBe(1);
+    });
+
+    describe("quota", () => {
+      const seed = (userId: string, n: number, createdAt: string) =>
+        pool.query(
+          `INSERT INTO urls (url, "shortCode", "ownerId", "createdAt")
+           SELECT 'https://example.com/' || g, $1::text || g, $2, ${createdAt} FROM generate_series(1, $3::int) g`,
+          [`${n}x${randomUUID().slice(0, 4)}`, userId, n],
+        );
+      const create = async (id: string) => request(app).post("/api/v1/links").set(await auth(id)).send({ url: "https://example.com/new" });
+
+      it("402s a free user at 50 links this month, with the upgrade link", async () => {
+        await seed(A, 49, "now()");
+        expect((await create(A)).status).toBe(201);
+        const res = await create(A);
+        expect(res.status).toBe(402);
+        expect(res.body.message).toBe("Monthly link limit reached (50 on the Free plan). Upgrade at http://localhost:5173/pricing");
+        expect(res.body.errors).toEqual({ upgradeUrl: "http://localhost:5173/pricing" });
+        expect((await pool.query(`SELECT count(*)::int AS n FROM urls WHERE "ownerId" = $1`, [A])).rows[0].n).toBe(50);
+      });
+
+      it("does not count links from before the start of the UTC month", async () => {
+        const monthStart = `date_trunc('month', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'`;
+        await seed(B, 50, `${monthStart} - interval '1 second'`);
+        expect((await create(B)).status).toBe(201);
+        await seed(B, 49, monthStart); // the first instant of the month does count
+        expect((await create(B)).status).toBe(402);
+      });
+
+      it("lets a Pro user past 50 (but not past 5000)", async () => {
+        await proSub(C);
+        await seed(C, 50, "now()");
+        expect((await create(C)).status).toBe(201);
+        await seed(C, 4949, "now()");
+        const res = await create(C);
+        expect(res.status).toBe(402);
+        expect(res.body.message).toContain("5000 on the Pro plan");
+      });
+    });
+
+    describe("checkout and portal", () => {
+      it("creates the customer once, then a subscription checkout session for it", async () => {
+        const customers = vi.spyOn(stripe.customers, "create").mockResolvedValue({ id: "cus_new" } as never);
+        const sessions = vi.spyOn(stripe.checkout.sessions, "create").mockResolvedValue({ url: "https://checkout.stripe.test/s" } as never);
+        const h = { Authorization: `Bearer ${await sign(A, { email: "a@example.com" })}` };
+
+        const res = await request(app).post("/api/v1/billing/checkout").set(h).expect(200);
+        expect(res.body.data).toEqual({ url: "https://checkout.stripe.test/s" });
+        expect(customers).toHaveBeenCalledWith({ email: "a@example.com", metadata: { userId: A } }, { idempotencyKey: `customer-${A}` });
+        expect(sessions).toHaveBeenCalledWith({
+          mode: "subscription",
+          customer: "cus_new",
+          line_items: [{ price: "price_test_pro", quantity: 1 }],
+          client_reference_id: A,
+          subscription_data: { metadata: { userId: A } },
+          success_url: "http://localhost:5173/billing?checkout=success",
+          cancel_url: "http://localhost:5173/billing?checkout=cancel",
+        });
+        expect(await subRow(A)).toMatchObject({ plan: "free", status: "none", stripeCustomerId: "cus_new" });
+
+        await request(app).post("/api/v1/billing/checkout").set(h).expect(200);
+        expect(customers).toHaveBeenCalledTimes(1);
+        expect(sessions).toHaveBeenCalledTimes(2);
+        expect(sessions).toHaveBeenLastCalledWith(expect.objectContaining({ customer: "cus_new" }));
+      });
+
+      it("409s when already Pro, and does not call Stripe", async () => {
+        await proSub(C);
+        const sessions = vi.spyOn(stripe.checkout.sessions, "create");
+        const res = await request(app).post("/api/v1/billing/checkout").set(await auth(C)).expect(409);
+        expect(res.body.message).toContain("billing portal");
+        expect(sessions).not.toHaveBeenCalled();
+      });
+
+      it("portal: 404 without a customer, then a portal session for the customer", async () => {
+        await request(app).post("/api/v1/billing/portal").set(await auth(A)).expect(404);
+        await proSub(A);
+        const portal = vi.spyOn(stripe.billingPortal.sessions, "create").mockResolvedValue({ url: "https://portal.stripe.test/p" } as never);
+        const res = await request(app).post("/api/v1/billing/portal").set(await auth(A)).expect(200);
+        expect(res.body.data).toEqual({ url: "https://portal.stripe.test/p" });
+        expect(portal).toHaveBeenCalledWith({ customer: `cus_${A}`, return_url: "http://localhost:5173/billing" });
+      });
+
+      it("API keys get 403 on every billing endpoint", async () => {
+        const key = (await request(app).post("/api/v1/keys").set(await auth(A)).send({ name: "ci" }).expect(201)).body.data.key;
+        const h = { Authorization: `Bearer ${key}` };
+        const customers = vi.spyOn(stripe.customers, "create");
+        await request(app).get("/api/v1/billing").set(h).expect(403);
+        await request(app).post("/api/v1/billing/checkout").set(h).expect(403);
+        await request(app).post("/api/v1/billing/portal").set(h).expect(403);
+        expect(customers).not.toHaveBeenCalled();
+      });
     });
   });
 });

@@ -5,9 +5,14 @@ import cors from "cors";
 import compression from "compression";
 import pool from "./config/database";
 import redis from "./config/redis";
-import { getUserPlan, PLANS } from "./config/plans";
+import stripe from "./config/stripe";
+import { FRONTEND_ORIGIN, PLANS } from "./config/plans";
 import { UrlRepository } from "./repositories/url.repository";
 import { ClickRepository } from "./repositories/click.repository";
+import { SubscriptionRepository } from "./repositories/subscription.repository";
+import { BillingService } from "./services/billing.service";
+import { BillingController } from "./controllers/billing.controller";
+import { createBillingRouter } from "./routes/billing.routes";
 import { UrlService } from "./services/url.service";
 import { UrlController } from "./controllers/url.controller";
 import { createUrlRouter } from "./routes/url.routes";
@@ -32,13 +37,14 @@ const createApp = (): Application => {
 
   // ── Global middleware ──────────────────────────────────────────────────────
   app.use(helmet());
-  app.use(cors({ origin: process.env.FRONTEND_ORIGIN || "http://localhost:5173" }));
+  app.use(cors({ origin: FRONTEND_ORIGIN }));
   app.use(compression());
-  app.use(express.json());
 
   // ── Dependency wiring ──────────────────────────────────────────────────────
   const urlRepository = new UrlRepository(pool);
-  const urlService = new UrlService(urlRepository, redis, new ClickRepository(pool));
+  const billingService = new BillingService(new SubscriptionRepository(pool), urlRepository, redis, stripe);
+  const billingController = new BillingController(billingService);
+  const urlService = new UrlService(urlRepository, redis, new ClickRepository(pool), billingService);
   const urlController = new UrlController(urlService);
   const apiKeyRepository = new ApiKeyRepository(pool);
   const apiKeyService = new ApiKeyService(apiKeyRepository);
@@ -48,7 +54,7 @@ const createApp = (): Application => {
   const apiRateLimit = rateLimit({
     redis,
     windowMs: 60_000,
-    limit: async (req) => PLANS[await getUserPlan(req.user!.id)].apiRequestsPerMinute,
+    limit: async (req) => PLANS[await billingService.getPlan(req.user!.id)].apiRequestsPerMinute,
     key: (req) => (req.user!.apiKeyId ? `api:key:${req.user!.apiKeyId}` : `api:user:${req.user!.id}`),
   });
   // Public redirects are limited per client IP; only a truncated hash of it goes into Redis.
@@ -63,9 +69,15 @@ const createApp = (): Application => {
   app.get("/health", (_req: Request, res: Response) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
+  // Stripe webhook: unauthenticated and not rate-limited (the signature is the auth). It must come
+  // BEFORE express.json(): the signature is over the exact raw bytes, which json parsing would destroy.
+  app.post("/api/v1/billing/webhook", express.raw({ type: "application/json" }), billingController.webhook);
+  app.use(express.json());
+
   app.use("/api/v1", requireAuth, apiRateLimit);
   app.use("/api/v1/links", createUrlRouter(urlController));
   app.use("/api/v1/keys", createApiKeyRouter(apiKeyController));
+  app.use("/api/v1/billing", createBillingRouter(billingController));
   app.get("/:code", redirectRateLimit, validate(shortCodeParamSchema, "params"), urlController.redirect);
   
   app.use(errorHandler);
