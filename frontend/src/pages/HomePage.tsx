@@ -51,6 +51,14 @@ const features = [
   },
 ]
 
+const sampleRequest = `Authorization: Bearer ru_live_…
+Content-Type: application/json
+
+{
+  "url": "https://example.com/very/long/path",
+  "customCode": "mylink"
+}`
+
 const sampleResponse = `{
   "status": "success",
   "data": {
@@ -201,15 +209,10 @@ export default function HomePage() {
                 <span className="text-xs font-mono bg-emerald-400/10 text-emerald-400 px-2 py-0.5 rounded">POST</span>
                 <span className="text-xs font-mono text-text-muted">/api/v1/links</span>
               </div>
-              <CopyButton text={`{"url":"https://example.com/very/long/path","customCode":"mylink"}`} />
+              <CopyButton text={sampleRequest} />
             </div>
-            <pre className="px-4 py-4 text-xs font-mono text-text-secondary border-b border-surface-border 
-            overflow-x-auto"
-            >
-              {`{
-                "url": "https://example.com/very/long/path",
-                "customCode": "mylink"
-              }`}
+            <pre className="px-4 py-4 text-xs font-mono text-text-secondary border-b border-surface-border overflow-x-auto">
+              {sampleRequest}
             </pre>
 
             {/* Response */}
