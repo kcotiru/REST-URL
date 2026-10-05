@@ -18,8 +18,8 @@ export default function Footer() {
           </span>
         </div>
 
-        <nav className="flex items-center gap-6 text-sm text-text-muted font-body">
-          {[['/', 'Home'], ['/shorten', 'Shorten'], ['/stats', 'Stats']].map(([to, label]) => (
+        <nav className="flex flex-wrap justify-center items-center gap-x-6 gap-y-2 text-sm text-text-muted font-body">
+          {[['/', 'Home'], ['/pricing', 'Pricing'], ['/dashboard', 'Dashboard'], ['/keys', 'API keys'], ['/billing', 'Billing']].map(([to, label]) => (
             <Link key={to} to={to} className="hover:text-text-secondary transition-colors">
               {label}
             </Link>

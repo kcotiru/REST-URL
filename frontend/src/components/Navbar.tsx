@@ -3,10 +3,14 @@ import { Link, useLocation } from 'react-router-dom'
 import { Zap, Menu, X } from 'lucide-react'
 import { supabase, useSession } from '../lib/supabase'
 
-const links = [
+const publicLinks = [
   { to: '/', label: 'Home' },
-  { to: '/shorten', label: 'Shorten' },
-  { to: '/stats', label: 'Stats' },
+  { to: '/pricing', label: 'Pricing' },
+]
+const authLinks = [
+  { to: '/dashboard', label: 'Dashboard' },
+  { to: '/keys', label: 'API keys' },
+  { to: '/billing', label: 'Billing' },
 ]
 
 export default function Navbar() {
@@ -14,6 +18,7 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false)
   const [open, setOpen] = useState(false)
   const session = useSession()
+  const links = session ? [...publicLinks.slice(0, 1), ...authLinks, ...publicLinks.slice(1)] : publicLinks
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20)
@@ -41,7 +46,7 @@ export default function Navbar() {
         </Link>
 
         {/* Desktop nav */}
-        <div className="hidden md:flex items-center gap-1">
+        <div className="hidden lg:flex items-center gap-1">
           {links.map(({ to, label }) => (
             <Link
               key={to}
@@ -80,8 +85,11 @@ export default function Navbar() {
 
         {/* Mobile toggle */}
         <button
-          className="md:hidden text-text-secondary hover:text-text-primary"
+          className="lg:hidden text-text-secondary hover:text-text-primary p-1 rounded focus:outline-none
+          focus-visible:ring-2 focus-visible:ring-accent/60"
           onClick={() => setOpen(!open)}
+          aria-label={open ? 'Close menu' : 'Open menu'}
+          aria-expanded={open}
         >
           {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </button>
@@ -89,7 +97,7 @@ export default function Navbar() {
 
       {/* Mobile menu */}
       {open && (
-        <div className="md:hidden bg-surface-raised border-b border-surface-border 
+        <div className="lg:hidden bg-surface-raised border-b border-surface-border 
         px-6 py-4 flex flex-col gap-2">
           {links.map(({ to, label }) => (
             <Link
