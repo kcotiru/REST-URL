@@ -1,6 +1,6 @@
 # REST URL - frontend
 
-React 18 + Vite + TypeScript + Tailwind app: landing, pricing, sign-in (Supabase), dashboard, link analytics, API keys and billing. Setup and environment variables are in the [root README](../README.md).
+React 18 + Vite + TypeScript + Tailwind app: landing, pricing, sign-in (Supabase), dashboard, link analytics, API keys and billing. See the [root README](../README.md); setup and env vars: [docs/setup.md](../docs/setup.md).
 
 Vite proxies `/api/*` to the backend on `http://localhost:3000` in development. All backend calls live in `src/lib/api.ts`; Supabase auth in `src/lib/supabase.ts`.
 

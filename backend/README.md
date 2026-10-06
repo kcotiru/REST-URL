@@ -1,6 +1,6 @@
 # REST URL - backend
 
-Express + TypeScript API, click worker, SQL migrations (`db/migrations`), tests and benchmark. Setup, environment variables, API reference and design notes are in the [root README](../README.md).
+Express + TypeScript API, click worker, SQL migrations (`db/migrations`), tests and benchmark. See the [root README](../README.md); setup and env vars: [docs/setup.md](../docs/setup.md), API: [docs/api.md](../docs/api.md), design: [docs/design.md](../docs/design.md).
 
 ```
 src/config/        pg pool, Redis client, Stripe client, plan limits
@@ -15,6 +15,6 @@ test/              Vitest + supertest  bench/          autocannon redirect bench
 | `npm run dev` | API with hot reload |
 | `npm run worker` | click worker with hot reload (needs Redis) |
 | `npm run build` / `npm start` / `npm run start:worker` | production build and run |
-| `npm test` | test suite (needs `TEST_DATABASE_URL` and `TEST_REDIS_URL`, see the root README) |
+| `npm test` | test suite (needs `TEST_DATABASE_URL` and `TEST_REDIS_URL`, see [docs/setup.md](../docs/setup.md)) |
 | `npm run typecheck` | `tsc` on `src`, then on `src` + `test` |
-| `npm run bench` | redirect benchmark (see the root README) |
+| `npm run bench` | redirect benchmark (see [docs/design.md](../docs/design.md)) |

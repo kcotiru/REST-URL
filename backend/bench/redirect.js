@@ -1,4 +1,4 @@
-// Redirect benchmark: `npm run bench`. See "Benchmark" in the root README.
+// Redirect benchmark: `npm run bench`. See "Benchmark" in docs/design.md.
 //
 // Needs a running backend (BENCH_URL, default http://localhost:3000) wired to a Postgres seeded with:
 //   cached0001            one link (the CACHED scenario hits only this)
