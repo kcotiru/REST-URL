@@ -6,6 +6,15 @@
 //   w0000001..w<M>        M links used only for warmup, so they never pollute the measured range
 // and REDIS_URL set to the same Redis the backend uses. That Redis DB is FLUSHED before each scenario.
 // Run the backend with REDIRECT_LIMIT_PER_MIN set high, or the per-IP limiter answers 429.
+//
+// To reproduce: start the compose services, create a database (the run used urlshortener_bench, 400,001 links),
+// apply migrations 001-007 (with a stub auth.users, see backend/test/api.test.ts), seed with generate_series
+// (cached0001, k0000001..k0300000 measured, w0000001..w0100000 warmup), start the compiled backend (dist/) with
+// REDIRECT_LIMIT_PER_MIN=100000000 and PORT/REDIS_URL/DATABASE_URL pointing at the bench database, then run
+//   BENCH_URL=http://localhost:<port> REDIS_URL=<same redis, e.g. a dedicated DB like /13> npm run bench
+// Percentiles come from every response's own timing (autocannon's histogram has 1 ms buckets and no p95).
+// Reference points on the same machine: bare http.createServer 302 ~25,000 req/s, bare Express + helmet,
+// compression and cors ~3,700 req/s, this app's /health ~2,700 req/s.
 const autocannon = require("autocannon");
 const Redis = require("ioredis");
 
